@@ -114,6 +114,13 @@ npm run start
 
 <img src="assets/screenshots/memory-map.png" alt="Elshine Memory Map" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
 
+<br /><br />
+
+### 👤 Minimalist User Identity & Companion Studio
+*Author custom companions, manage persona traits, bind social profiles, and review created characters.*
+
+<img src="assets/screenshots/profile-page.png" alt="Elshine User Profile" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
+
 </div>
 
 ---
