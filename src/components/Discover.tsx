@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Heart, Users, ArrowRight, Zap, Globe, Sparkles, Shield, X, Plus } from 'lucide-react';
+import { Search, Heart, MessageSquare, ArrowRight, X, Plus } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Character } from '../types';
 import { cn } from '../lib/utils';
@@ -25,7 +25,7 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
     async function load() {
       try {
         const data = await listCharacters('public');
-        if (active) setCharacters(data.characters);
+        if (active) setCharacters(data.characters || []);
       } catch (error) {
         console.error('Error loading public characters:', error);
       } finally {
@@ -42,14 +42,16 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
 
   const filters = [
     'All', 'Popular', 'Trending', 'New', 'Romance', 
-    'Fantasy', 'Anime', 'Roleplay', 'Sci-Fi', 'Funny', 
-    'Adventure', 'Gaming', 'Friends'
+    'Fantasy', 'Anime', 'Roleplay', 'Sci-Fi', 'Gaming', 
+    'Adventure', 'Funny', 'Friends'
   ];
 
   const filteredCharacters = characters.filter(char => {
-    const matchesSearch = (char.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         (char.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (char.tags || []).some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch = !q || 
+      (char.name || '').toLowerCase().includes(q) || 
+      (char.description || '').toLowerCase().includes(q) ||
+      (char.tags || []).some(t => t.toLowerCase().includes(q));
     
     let matchesFilter = true;
     if (activeFilter !== 'All' && activeFilter !== 'Popular' && activeFilter !== 'Trending' && activeFilter !== 'New') {
@@ -69,152 +71,145 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
 
   return (
     <div className="flex-1 h-full bg-white font-sans text-black overflow-y-auto">
-      {/* 1. Hero Header */}
-      <header className="px-6 md:px-12 py-12 border-b border-zinc-100 bg-white">
-        <div className="max-w-4xl mx-auto text-center space-y-6">
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <span className="text-[10px] font-black uppercase tracking-[0.6em] text-zinc-400 block mb-3">Public Manifestations</span>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tighter uppercase leading-[0.85] mb-6">
-              Discover <br /> Companions.
-            </h1>
-            <p className="text-sm text-zinc-500 font-light max-w-lg mx-auto leading-relaxed">
-              Explore hundreds of digital souls crafted by the community. Start a conversation and begin building shared memories.
-            </p>
-          </motion.div>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="relative max-w-xl mx-auto"
-          >
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-            <input 
-              type="text"
-              placeholder="Search by name, archetype, or keywords..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-zinc-50 border border-zinc-200/80 rounded-full py-4 pl-14 pr-12 focus:outline-none focus:ring-4 focus:ring-zinc-100 focus:bg-white transition-all text-sm font-medium shadow-xs"
-            />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-zinc-200 text-zinc-400 hover:text-black transition-colors"
-                title="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </motion.div>
-        </div>
-      </header>
+      {/* 1. Sleek Compact Header */}
+      <header className="px-6 md:px-10 pt-8 pb-5 border-b border-zinc-100 bg-white sticky top-0 z-20 backdrop-blur-md bg-white/95">
+        <div className="max-w-7xl mx-auto space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight uppercase leading-none">Explore</h1>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 bg-zinc-100 px-2.5 py-0.5 rounded-full">
+                  {filteredCharacters.length} {filteredCharacters.length === 1 ? 'companion' : 'companions'}
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 mt-1">Discover community personas and start persistent roleplay.</p>
+            </div>
 
-      {/* 2. Category Filters & Status Bar */}
-      <div className="px-6 md:px-12 py-5 border-b border-zinc-100 sticky top-0 bg-white/90 backdrop-blur-xl z-20 shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full sm:w-auto py-1">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+              <input 
+                type="text"
+                placeholder="Search companions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-zinc-50 border border-zinc-200/80 rounded-full py-2 pl-9.5 pr-8 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-zinc-400 text-xs font-medium placeholder:text-zinc-400 transition-all"
+              />
+              {searchQuery && (
+                <button 
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-black p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 pb-0.5">
             {filters.map(filter => (
               <button
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
                 className={cn(
-                  "px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap transition-all cursor-pointer",
+                  "px-3.5 py-1.5 rounded-full text-[11px] font-semibold tracking-wide whitespace-nowrap transition-all cursor-pointer",
                   activeFilter === filter 
-                    ? "bg-black text-white shadow-md shadow-zinc-200" 
-                    : "bg-zinc-100/70 text-zinc-500 hover:text-black hover:bg-zinc-200/70"
+                    ? "bg-black text-white shadow-xs" 
+                    : "bg-zinc-100/80 text-zinc-600 hover:bg-zinc-200/70 hover:text-black"
                 )}
               >
                 {filter}
               </button>
             ))}
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 shrink-0 hidden sm:block">
-            {filteredCharacters.length} Available
-          </span>
         </div>
-      </div>
+      </header>
 
-      {/* 3. Grid Content */}
-      <main className="px-6 md:px-12 py-12 max-w-7xl mx-auto">
+      {/* 2. Character Grid */}
+      <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 space-y-4">
-            <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Loading gallery...</p>
+          <div className="flex flex-col items-center justify-center py-28 space-y-3">
+            <div className="w-7 h-7 border-2 border-black border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-zinc-400 font-medium">Loading companions...</p>
           </div>
         ) : filteredCharacters.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
             {filteredCharacters.map((char, index) => (
               <motion.div 
                 key={char.id}
-                initial={{ opacity: 0, y: 15 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.04 }}
-                className="group relative"
+                transition={{ duration: 0.25, delay: Math.min(index * 0.02, 0.3) }}
+                className="group flex flex-col bg-white border border-zinc-200/70 rounded-2xl overflow-hidden hover:border-zinc-300 hover:shadow-md transition-all duration-300"
               >
-                <div className="bg-zinc-50 rounded-3xl overflow-hidden border border-zinc-100 transition-all duration-500 hover:bg-white hover:border-zinc-300 hover:shadow-2xl hover:shadow-zinc-200 group-hover:-translate-y-1.5 flex flex-col h-full">
-                  <div className="relative h-64 overflow-hidden bg-zinc-100">
-                    <img 
-                      src={characterAvatar(char)} 
-                      alt={char.name} 
-                      loading="lazy"
-                      className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-700" 
-                    />
-                    <div className="absolute top-4 right-4 flex gap-2">
-                      {char.rating === 'mature' && (
-                        <span className="bg-black/80 backdrop-blur-md text-white text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest">18+</span>
-                      )}
-                      <div className="bg-black/60 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-white">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Online
-                      </div>
-                    </div>
-                    
-                    <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/90 via-black/40 to-transparent text-white">
-                      <div className="flex items-end justify-between">
-                        <div>
-                          <h3 className="text-xl font-bold tracking-tight uppercase mb-0.5">{char.name}</h3>
-                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-300 flex items-center gap-1.5">
-                            <span className="w-1 h-1 bg-zinc-300 rounded-full" />
-                            By {char.creatorName || 'Community'}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1 justify-end max-w-[140px]">
-                          {(char.tags || []).slice(0, 2).map(tag => (
-                            <span key={tag} className="text-[8px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-1 rounded-full backdrop-blur-md">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
+                <div 
+                  onClick={() => handleChat(char.id)}
+                  className="aspect-[4/5] bg-zinc-100 relative overflow-hidden cursor-pointer"
+                >
+                  <img 
+                    src={characterAvatar(char)} 
+                    alt={char.name} 
+                    loading="lazy"
+                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 group-hover:scale-105 transition-all duration-500" 
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+                  {/* Top Badges */}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                    {char.rating === 'mature' && (
+                      <span className="bg-black/70 backdrop-blur-xs text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        18+
+                      </span>
+                    )}
+                    {char.knowsUserFromStart && (
+                      <span className="bg-white/90 text-black text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+                        Familiar
+                      </span>
+                    )}
                   </div>
-                  
-                  <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
-                    <p className="text-zinc-500 text-sm leading-relaxed line-clamp-2">
-                      {char.description || "A dynamic personality waiting to chat."}
+
+                  {/* Bottom Image Info */}
+                  <div className="absolute bottom-3 left-3 right-3 text-white space-y-0.5">
+                    <h3 className="text-base font-bold tracking-tight uppercase leading-tight drop-shadow-xs">{char.name}</h3>
+                    <p className="text-[10px] text-zinc-300 font-medium line-clamp-1">
+                      {char.role || (char.creatorName ? `By ${char.creatorName}` : 'Companion')}
                     </p>
-                    
-                    <div className="flex items-center justify-between pt-3 border-t border-zinc-100">
-                      <div className="flex items-center gap-4 text-zinc-400 text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-bold tracking-wider">{((char.stats?.conversations || 1)).toLocaleString()}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                          <span className="text-[10px] font-bold tracking-wider">{((char.stats?.likes || 1)).toLocaleString()}</span>
-                        </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 flex-1 flex flex-col justify-between space-y-3">
+                  <p className="text-zinc-500 text-xs leading-relaxed line-clamp-2">
+                    {char.description || "A distinct personality ready to converse."}
+                  </p>
+
+                  <div className="space-y-2.5 pt-1 border-t border-zinc-100">
+                    <div className="flex flex-wrap gap-1">
+                      {(char.tags || []).slice(0, 2).map(tag => (
+                        <span key={tag} className="text-[9px] font-medium uppercase tracking-wider bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-md">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between text-zinc-400 text-xs pt-0.5">
+                      <div className="flex items-center gap-2.5 text-[11px]">
+                        <span className="flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3" />
+                          {char.stats?.conversations || 1}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Heart className="w-3 h-3" />
+                          {char.stats?.likes || 0}
+                        </span>
                       </div>
-                      
+
                       <button 
                         onClick={() => handleChat(char.id)}
-                        className="bg-black text-white px-5 py-2 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-zinc-800 transition-all flex items-center gap-2 group-hover:scale-105 cursor-pointer"
+                        className="bg-black text-white hover:bg-zinc-800 text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full transition-colors flex items-center gap-1 cursor-pointer"
                       >
-                        Chat <ArrowRight className="w-3.5 h-3.5" />
+                        Chat <ArrowRight className="w-2.5 h-2.5" />
                       </button>
                     </div>
                   </div>
@@ -223,59 +218,27 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
             ))}
           </div>
         ) : (
-          <div className="py-20 text-center bg-zinc-50 rounded-3xl border border-zinc-100 p-12 max-w-lg mx-auto space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mx-auto text-zinc-400 shadow-md shadow-zinc-100">
-              <Search className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold tracking-tight uppercase">No matching companions</h3>
-              <p className="text-zinc-500 text-xs leading-relaxed mt-2">
-                We couldn't find any characters matching "{searchQuery}". Try changing your filters or create your own custom companion.
-              </p>
-            </div>
-            <div className="flex justify-center gap-4 pt-2">
+          <div className="py-20 text-center space-y-4 border border-dashed border-zinc-200 rounded-2xl p-8 max-w-md mx-auto">
+            <p className="text-zinc-500 text-xs font-medium">
+              {searchQuery ? `No companions found matching "${searchQuery}".` : 'No companions found in this category.'}
+            </p>
+            <div className="flex justify-center gap-2.5">
               <button 
                 onClick={() => { setSearchQuery(''); setActiveFilter('All'); }}
-                className="px-6 py-2.5 border border-zinc-200 text-black rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-white transition-colors cursor-pointer"
+                className="px-4 py-2 border border-zinc-200 text-black rounded-full text-xs font-bold uppercase tracking-wider hover:bg-zinc-50 transition-colors cursor-pointer"
               >
-                Reset Search
+                Reset
               </button>
               <button 
                 onClick={() => navigate('/create')}
-                className="px-6 py-2.5 bg-black text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-colors flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 bg-black text-white rounded-full text-xs font-bold uppercase tracking-wider hover:bg-zinc-800 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" /> Create New
+                <Plus className="w-3.5 h-3.5" /> Create
               </button>
             </div>
           </div>
         )}
       </main>
-
-      {/* 4. Bottom Features Banner */}
-      <section className="px-6 md:px-12 py-16 border-t border-zinc-100 bg-zinc-50/50">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            { title: 'Global Public Roster', desc: 'Browse hundreds of unique voices, backstories, and archetypes.', icon: Globe },
-            { title: 'Verified Quality', desc: 'Engineered for consistent roleplay and zero robotic repetition.', icon: Shield },
-            { title: 'Instant Synaptic Memory', desc: 'Companions build enduring memory links as you chat.', icon: Sparkles }
-          ].map((feature, i) => {
-            const Icon = feature.icon;
-            return (
-              <div key={i} className="flex items-start gap-4 p-6 bg-white rounded-2xl border border-zinc-100 shadow-xs">
-                <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center text-black shrink-0">
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-bold uppercase tracking-tight">{feature.title}</h4>
-                  <p className="text-zinc-500 text-xs font-light leading-relaxed">
-                    {feature.desc}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
     </div>
   );
 };
