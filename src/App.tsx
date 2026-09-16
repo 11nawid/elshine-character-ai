@@ -22,6 +22,7 @@ import Onboarding from './components/Onboarding';
 import AuthPage from './components/auth/AuthPage';
 import { RequireAuth, RequireOnboarding, PublicOnlyRoute, LoadingScreen, hasFilledAnyProfile } from './components/auth/RouteGuards';
 import * as Pages from './pages/ContentPages';
+import { MobileNotice } from './components/MobileNotice';
 
 /**
  * Main authenticated application layout:
@@ -99,6 +100,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <MobileNotice />
       <Routes>
         {/* Root Route: Landing for guests, Home for authenticated users */}
         <Route

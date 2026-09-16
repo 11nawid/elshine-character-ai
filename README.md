@@ -11,14 +11,13 @@
 [![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_CSS-v4.1-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
 [![Google Gemini](https://img.shields.io/badge/Engine-Google%20Gemini%202.5%20Flash-orange?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Firebase](https://img.shields.io/badge/Database-Cloud%20Firestore-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/11nawid/elshine-character-ai)
 
 <br />
 
 > **An open-source alternative to Character.ai and JanitorAI.**  
 > Create, discover, and converse with authentic digital personalities that naturally remember your conversations, preferences, and lore across every session.
 
-[✨ Live Demo](http://localhost:3000) • [🚀 Quick Start](#-quick-start) • [🧠 Memory Architecture](#-how-memory-works) • [🔑 API Setup](#-recommended-ai-engine--api-key) • [🤝 Contributing](#-contributing)
+[✨ Live Demo](http://localhost:3000) • [📸 Screenshots](#-interface--screenshots) • [🚀 Quick Start](#-quick-start) • [🧠 Memory Architecture](#-how-memory-works) • [🔮 Roadmap](#-upcoming-roadmap--future-visions) • [🔑 API Setup](#-recommended-ai-engine--api-key)
 
 </div>
 
@@ -99,14 +98,36 @@ This produces an optimized Vite bundle in `dist/` and compiles the Node.js Expre
 npm run start
 ```
 
-### 1-Click Deploy to Vercel
-You can deploy Elshine directly to Vercel:
+## 📸 Interface & Screenshots
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/11nawid/elshine-character-ai)
+<div align="center">
 
-Ensure you set `GEMINI_API_KEY` and `FIREBASE_SERVICE_ACCOUNT` in your Vercel Project Environment Variables.
+### 🏠 Companion Hub & Active Roleplay Dashboard
+*Discover canonical companions, resume recent threads, and inspect real-time synaptic connection status.*
+
+<img src="assets/screenshots/home-page.png" alt="Elshine Companion Dashboard" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
+
+<br /><br />
+
+### 🌌 Interactive Synaptic Memory Constellation Graph
+*Visual interactive graph displaying associative memory nodes formed between users and companions over conversational turns.*
+
+<img src="assets/screenshots/memory-map.png" alt="Elshine Memory Map" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
+
+</div>
 
 ---
+
+## 🔮 Upcoming Roadmap & Future Visions
+
+We are continuously pushing the boundaries of autonomous digital companions. Here is what is actively planned for upcoming versions of Elshine Character AI:
+
+- **📬 Inbound AI Character Temp Mail (Free Companion Inboxes)**  
+  Every companion will have their own dedicated, free inbound email address. Anyone can email a character directly from their personal inbox, and the character will asynchronously comprehend the email, recall prior memories, and send authentic in-character replies back to your inbox.
+- **🌐 Autonomous AI Social Media Profiles**  
+  Companions will possess real social media accounts across major platforms (Instagram, X/Twitter, Discord). Characters will independently generate and publish thoughts, daily updates, visual snapshots, and interact with community followers autonomously.
+- **🔎 Social Media Account Intelligence & Ingestion**  
+  Companions will gain the ability to inspect, analyze, and review external social media accounts in real time. They will be able to inspect public profiles, evaluate post history, observe follower counts, detect engagement trends, and bring up relevant topics during your roleplay and conversations.
 
 ## 🧠 How Memory Works
 
@@ -169,6 +190,18 @@ elshine-character-ai/
 
 ---
 
+## 🤝 Contributing
+
+Contributions make the open-source community an incredible place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+Please see our comprehensive **[Contributing Guide](CONTRIBUTING.md)** for:
+- Local development guidelines
+- Coding and TypeScript standards
+- Commit message conventions
+- Pull request process
+
+---
+
 ## 📜 License
 
 Distributed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for more details.
@@ -182,4 +215,5 @@ Distributed under the **Apache 2.0 License**. See [LICENSE](LICENSE) for more de
 - **GitHub**: [@11nawid](https://github.com/11nawid)
 
 ⭐ **If you like this project, please consider giving it a star on GitHub! It helps more creators discover open-source AI.**
+
 
