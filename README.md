@@ -17,7 +17,7 @@
 > **An open-source alternative to Character.ai and JanitorAI.**  
 > Create, discover, and converse with authentic digital personalities that naturally remember your conversations, preferences, and lore across every session.
 
-[✨ Live Demo](http://localhost:3000) • [📸 Screenshots](#-interface--screenshots) • [🚀 Quick Start](#-quick-start) • [🧠 Memory Architecture](#-how-memory-works) • [🔮 Roadmap](#-upcoming-roadmap--future-visions) • [🔑 API Setup](#-recommended-ai-engine--api-key)
+[✨ Live Demo](https://www.elshine.in) • [📸 Screenshots](#-interface--screenshots) • [🚀 Quick Start](#-quick-start) • [🧠 Memory Architecture](#-how-memory-works) • [🔮 Roadmap](#-upcoming-roadmap--future-visions) • [🔑 API Setup](#-recommended-ai-engine--api-key)
 
 </div>
 
