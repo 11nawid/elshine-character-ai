@@ -1,0 +1,118 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 256 },
+        "photoURL": { "type": "string" },
+        "bio": { "type": "string", "maxLength": 1000 },
+        "nickname": { "type": "string", "maxLength": 100 },
+        "persona": { "type": "string", "maxLength": 2000 },
+        "location": { "type": "string", "maxLength": 200 },
+        "occupation": { "type": "string", "maxLength": 200 },
+        "interests": { "type": "array" },
+        "socials": { "type": "object" },
+        "onboardingCompleted": { "type": "boolean" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["displayName", "email", "createdAt"]
+    },
+    "Character": {
+      "title": "Character",
+      "description": "AI Character definition",
+      "type": "object",
+      "properties": {
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "personality": { "type": "string" },
+        "traits": { "type": "object" },
+        "backstory": { "type": "string" },
+        "speakingStyle": { "type": "string" },
+        "likes": { "type": "array" },
+        "dislikes": { "type": "array" },
+        "greeting": { "type": "string" },
+        "knowsUserFromStart": { "type": "boolean" },
+        "userRelationship": { "type": "string" },
+        "sharedHistory": { "type": "string" },
+        "userNickname": { "type": "string" },
+        "visibility": { "type": "string", "enum": ["public", "private", "unlisted"] },
+        "rating": { "type": "string", "enum": ["general", "mature"] },
+        "avatarUrl": { "type": "string" },
+        "tags": { "type": "array" },
+        "stats": { "type": "object" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["creatorId", "name", "description", "personality", "greeting", "visibility", "rating", "createdAt"]
+    },
+    "Chat": {
+      "title": "Chat",
+      "description": "Conversation between a user and a character",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "characterId": { "type": "string" },
+        "participants": { "type": "array" },
+        "lastMessage": { "type": "string" },
+        "lastMessageAt": { "type": "number" },
+        "unread": { "type": "boolean" },
+        "memories": { "type": "array" }
+      },
+      "required": ["userId", "characterId", "participants", "lastMessageAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Individual message in a chat",
+      "type": "object",
+      "properties": {
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "text": { "type": "string" },
+        "attachment": { "type": "object" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["chatId", "senderId", "role", "text", "createdAt"]
+    },
+    "LibraryItem": {
+      "title": "LibraryItem",
+      "description": "Saved content in user's library",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Image", "Scenario", "Prompt", "Template", "Saved"] },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["userId", "type", "title", "content", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/characters/{characterId}": {
+      "schema": "Character",
+      "description": "AI Characters"
+    },
+    "/chats/{chatId}": {
+      "schema": "Chat",
+      "description": "Conversations"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Messages within a conversation"
+    },
+    "/library/{itemId}": {
+      "schema": "LibraryItem",
+      "description": "User's library content"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Elshine Character AI",
+  "description": "A simple and clean platform to chat with AI characters. Created by Nawid Hussain.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
