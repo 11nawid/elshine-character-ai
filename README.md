@@ -109,14 +109,35 @@ npm run start
 
 <br /><br />
 
-### 🌌 Interactive Synaptic Memory Constellation Graph
-*Visual interactive graph displaying associative memory nodes formed between users and companions over conversational turns.*
+### 💬 Immersive Conversational Roleplay & Live Memory Ingestion
+*Dual-pane roleplay console with streaming responses, ambient soundscapes, emotional state indicators, and inline memory tags.*
+
+<img src="assets/screenshots/chat-page.png" alt="Elshine Live Chat" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
+
+<br /><br />
+
+### 🧭 Minimalist Discovery & Companion Directory
+*Browse community-authored personas across categories and archetypes with instant filter pills and search.*
+
+<img src="assets/screenshots/explore-page.png" alt="Elshine Explore Page" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
+
+<br /><br />
+
+### 🌌 Universal Synaptic Memory Constellation
+*Physics-based neural network graph showing cross-session episodic knowledge nodes mapped across all companions.*
 
 <img src="assets/screenshots/memory-map.png" alt="Elshine Memory Map" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
 
 <br /><br />
 
-### 👤 Minimalist User Identity & Companion Studio
+### 🧠 Companion-Specific Memory Subsystem Graph
+*Focused cognitive graph visualizing associations, episodic facts, and synthesized reflections formed with a specific character.*
+
+<img src="assets/screenshots/character-memory-map.png" alt="Elshine Character Memory Map" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
+
+<br /><br />
+
+### 👤 Clean User Identity & Companion Studio
 *Author custom companions, manage persona traits, bind social profiles, and review created characters.*
 
 <img src="assets/screenshots/profile-page.png" alt="Elshine User Profile" width="95%" style="border-radius: 16px; border: 1px solid #e4e4e7; box-shadow: 0 10px 30px rgba(0,0,0,0.08);" />
