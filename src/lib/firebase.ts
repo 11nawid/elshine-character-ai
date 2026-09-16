@@ -4,7 +4,7 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 const env = (import.meta as any).env || {};
 
 const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY || "AIzaSyC89wdlKHGfkLDdUlksQzjW094H66UGx4g",
+  apiKey: env.VITE_FIREBASE_API_KEY || "",
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "elshinecharacter-ai.firebaseapp.com",
   projectId: env.VITE_FIREBASE_PROJECT_ID || "elshinecharacter-ai",
   storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "elshinecharacter-ai.firebasestorage.app",
