@@ -118,25 +118,7 @@ export async function generateChatResponse(
 ): Promise<string> {
   const config = brainConfig();
 
-  // 1. Primary: Free Unlimited Gemini Web Engine (from all-in-one-tool & gemini-free)
-  // Provides unlimited, fast, free generation without requiring API keys or incurring quota limits
-  try {
-    const webPrompt = formatPromptForWeb(systemPrompt, contents);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
-    try {
-      const text = await generateWeb(webPrompt, controller.signal);
-      if (text && text.trim().length > 0) {
-        return text.trim();
-      }
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (err: any) {
-    console.warn("Free web engine attempt encountered an issue, trying secondary options:", err?.message || err);
-  }
-
-  // 2. Secondary: Official Gemini API (if GEMINI_API_KEY is configured)
+  // 1. Primary: Official Gemini API (if GEMINI_API_KEY is configured)
   if (config.apiKey) {
     const candidates = Array.from(new Set([config.model, ...FALLBACK_MODELS]));
     const controller = new AbortController();
@@ -161,6 +143,24 @@ export async function generateChatResponse(
     } finally {
       clearTimeout(budget);
     }
+  }
+
+  // 2. Secondary: Free Unlimited Gemini Web Engine
+  // Provides unlimited, fast, free generation without requiring API keys or incurring quota limits
+  try {
+    const webPrompt = formatPromptForWeb(systemPrompt, contents);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    try {
+      const text = await generateWeb(webPrompt, controller.signal);
+      if (text && text.trim().length > 0) {
+        return text.trim();
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (err: any) {
+    console.warn("Free web engine attempt encountered an issue, trying secondary options:", err?.message || err);
   }
 
   // 3. Tertiary: OpenAI-compatible proxy (if OPENAI_COMPATIBLE_BASE_URL is configured)
@@ -236,16 +236,9 @@ export async function extractUserMemories(messages: any[]): Promise<string[]> {
   const convoText = formatConversationText(messages);
   let parsedMemories: string[] = [];
 
-  // 1. Try Free Web Engine for memory extraction
-  try {
-    parsedMemories = await extractWebMemories(convoText);
-    if (parsedMemories.length > 0) return parsedMemories;
-  } catch (err: any) {
-    console.warn("Free web engine memory extraction issue:", err?.message || err);
-  }
-
-  // 2. Fallback to Official API if configured
   const config = brainConfig();
+
+  // 1. Primary: Official API if configured
   if (config.apiKey) {
     const candidates = Array.from(new Set([config.model, ...FALLBACK_MODELS]));
     const controller = new AbortController();
@@ -273,7 +266,7 @@ export async function extractUserMemories(messages: any[]): Promise<string[]> {
             controller.signal
           );
           parsedMemories = cleanMemoryJson(result);
-          if (parsedMemories.length > 0) break;
+          if (parsedMemories.length > 0) return parsedMemories;
         } catch (error: any) {
           console.warn("AI memory extraction attempt unavailable:", error?.message || error);
         }
@@ -281,6 +274,14 @@ export async function extractUserMemories(messages: any[]): Promise<string[]> {
     } finally {
       clearTimeout(budget);
     }
+  }
+
+  // 2. Secondary: Try Free Web Engine for memory extraction
+  try {
+    parsedMemories = await extractWebMemories(convoText);
+    if (parsedMemories.length > 0) return parsedMemories;
+  } catch (err: any) {
+    console.warn("Free web engine memory extraction issue:", err?.message || err);
   }
 
   // 3. Fallback to OpenAI-compatible proxy if configured

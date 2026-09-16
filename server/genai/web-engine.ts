@@ -3,9 +3,9 @@ import path from "path";
 import crypto from "crypto";
 
 const DEFAULT_BL = "boq_assistant-bard-web-server_20260716.08_p0";
-const REQUEST_TIMEOUT_MS = 25000;
-const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY_MS = 1500;
+const REQUEST_TIMEOUT_MS = 16000;
+const RETRY_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 1000;
 
 interface WebEngineConfig {
   bl: string;

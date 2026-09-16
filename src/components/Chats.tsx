@@ -261,7 +261,7 @@ const Chats: React.FC<ChatsProps> = ({ selectedCharacterId }) => {
               }
             : {}),
         },
-        AbortSignal.timeout(14000)
+        AbortSignal.timeout(90000)
       );
 
       const raw = response.choices?.[0]?.message?.content || "";
@@ -309,8 +309,33 @@ const Chats: React.FC<ChatsProps> = ({ selectedCharacterId }) => {
         }
       }, 2500);
     } catch (err: any) {
-      console.warn("AI fetch encountered an issue, using in-character recovery:", err);
-      if (activeChatIdRef.current === targetChatId) {
+      console.warn("AI fetch encountered a delay/issue, checking server status:", err);
+      // Seamless recovery: check if the server finished and saved the response to Firestore
+      let recovered = false;
+      for (const delay of [1500, 3000]) {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          if (activeChatIdRef.current === targetChatId) {
+            const fresh = await getChat(targetChatId);
+            if (fresh?.messages && fresh.messages.length > 0) {
+              const last = fresh.messages[fresh.messages.length - 1];
+              if (last.role === "assistant" && last.id !== "initial") {
+                setMessages(fresh.messages);
+                if (fresh.chat?.memories) {
+                  setActiveChat((prev) => (prev && prev.id === targetChatId ? { ...prev, memories: fresh.chat.memories } : prev));
+                  setChats((prev) => prev.map((c) => (c.id === targetChatId ? { ...c, memories: fresh.chat.memories } : c)));
+                }
+                recovered = true;
+                break;
+              }
+            }
+          }
+        } catch {
+          // Ignore check errors
+        }
+      }
+
+      if (!recovered && activeChatIdRef.current === targetChatId) {
         setMessages((prev) => {
           const next = prev.filter((m) => m.id !== "temp" && m.id !== "temp-assistant");
           if (tempMessage) next.push(tempMessage);
@@ -344,7 +369,7 @@ const Chats: React.FC<ChatsProps> = ({ selectedCharacterId }) => {
             ? { assistantMessageId: assistantMsgId }
             : {}),
         },
-        AbortSignal.timeout(14000)
+        AbortSignal.timeout(90000)
       );
 
       const raw = response.choices?.[0]?.message?.content || "";
@@ -378,8 +403,32 @@ const Chats: React.FC<ChatsProps> = ({ selectedCharacterId }) => {
         }
       }
     } catch (err: any) {
-      console.warn("AI fetch encountered an issue during regeneration:", err);
-      if (activeChatIdRef.current === targetChatId) {
+      console.warn("AI fetch encountered an issue during regeneration, checking server status:", err);
+      let recovered = false;
+      for (const delay of [1500, 3000]) {
+        try {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          if (activeChatIdRef.current === targetChatId) {
+            const fresh = await getChat(targetChatId);
+            if (fresh?.messages && fresh.messages.length > 0) {
+              const last = fresh.messages[fresh.messages.length - 1];
+              if (last.role === "assistant" && last.id !== "initial") {
+                setMessages(fresh.messages);
+                if (fresh.chat?.memories) {
+                  setActiveChat((prev) => (prev && prev.id === targetChatId ? { ...prev, memories: fresh.chat.memories } : prev));
+                  setChats((prev) => prev.map((c) => (c.id === targetChatId ? { ...c, memories: fresh.chat.memories } : c)));
+                }
+                recovered = true;
+                break;
+              }
+            }
+          }
+        } catch {
+          // Ignore check errors
+        }
+      }
+
+      if (!recovered && activeChatIdRef.current === targetChatId) {
         setMessages((prev) => [...prev.filter((m) => m.id !== assistantMsgId), {
           id: "temp-assistant",
           chatId: targetChatId,
