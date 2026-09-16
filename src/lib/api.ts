@@ -13,23 +13,36 @@ export class ApiError extends Error {
   }
 }
 
-async function getFreshToken(): Promise<string> {
+async function getFreshToken(): Promise<string | null> {
   const user = auth.currentUser;
-  if (!user) throw new ApiError("Not signed in", 401, "unauthenticated");
+  if (!user) return null;
   return user.getIdToken();
 }
 
-async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+  authRequired = true
+): Promise<T> {
   const token = await getFreshToken();
+  if (authRequired && !token) {
+    throw new ApiError("Not signed in", 401, "unauthenticated");
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   let res: Response;
   try {
     res = await fetch(`/api${path}`, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       signal,
     });
@@ -90,11 +103,11 @@ export function updateMe(partial: Partial<User>): Promise<{ user: User }> {
 export type CharacterScope = "mine" | "public";
 
 export async function listCharacters(scope: CharacterScope = "public"): Promise<{ characters: Character[] }> {
-  return request<{ characters: Character[] }>("GET", `/characters?scope=${scope}`);
+  return request<{ characters: Character[] }>("GET", `/characters?scope=${scope}`, undefined, undefined, scope === "mine");
 }
 
 export function getCharacter(id: string): Promise<{ character: Character }> {
-  return request<{ character: Character }>("GET", `/characters/${id}`);
+  return request<{ character: Character }>("GET", `/characters/${id}`, undefined, undefined, false);
 }
 
 export function createCharacter(data: Partial<Character>): Promise<{ character: Character }> {

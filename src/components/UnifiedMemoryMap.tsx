@@ -224,7 +224,7 @@ export const UnifiedMemoryMap: React.FC<UnifiedMemoryMapProps> = ({
   // Pointer & Drag Event Handlers
   const handleNodePointerDown = useCallback((nodeId: string, e: React.PointerEvent) => {
     e.stopPropagation();
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
 
     const target = simNodesRef.current.find(n => n.id === nodeId);
     if (!target) return;
@@ -251,7 +251,7 @@ export const UnifiedMemoryMap: React.FC<UnifiedMemoryMapProps> = ({
     if ((e.target as HTMLElement).closest('button, input, select, [data-interactive="true"]')) {
       return;
     }
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
 
     dragRef.current = {
       mode: 'pan',
@@ -340,7 +340,7 @@ export const UnifiedMemoryMap: React.FC<UnifiedMemoryMapProps> = ({
   }, [onClose, onNavigateToChat]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     setZoom(prev => Number(Math.max(0.4, Math.min(2.5, prev * factor)).toFixed(2)));
   }, []);

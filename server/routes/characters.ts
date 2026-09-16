@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth, currentUser } from "../auth";
+import { requireAuth, optionalAuth, currentUser, optionalCurrentUser } from "../auth";
 import {
   createCharacter,
   deleteCharacter,
@@ -21,11 +21,9 @@ import {
   requireEnum,
   requireString,
 } from "../validation";
-import { asyncHandler, forbidden, notFound } from "../errors";
+import { asyncHandler, forbidden, notFound, unauthorized } from "../errors";
 
 export const charactersRouter = Router();
-
-charactersRouter.use(requireAuth);
 
 const VISIBILITIES = ["public", "private", "unlisted"] as const;
 const RATINGS = ["general", "mature"] as const;
@@ -81,22 +79,30 @@ async function creatorNameFor(uid: string, fallback?: string): Promise<string> {
   return user?.displayName || fallback || "Anonymous";
 }
 
-charactersRouter.get("/", asyncHandler(async (req, res) => {
+charactersRouter.get("/", optionalAuth, asyncHandler(async (req, res) => {
   const scope = req.query.scope === "mine" ? "mine" : "public";
-  const characters = scope === "mine" ? await listCharactersByCreator(currentUser(res).uid) : await listPublicCharacters();
+  if (scope === "mine") {
+    const user = optionalCurrentUser(res);
+    if (!user) throw unauthorized("Authentication required to view your characters");
+    const characters = await listCharactersByCreator(user.uid);
+    res.json({ characters });
+    return;
+  }
+  const characters = await listPublicCharacters();
   res.json({ characters });
 }));
 
-charactersRouter.get("/:id", asyncHandler(async (req, res) => {
+charactersRouter.get("/:id", optionalAuth, asyncHandler(async (req, res) => {
   const character = await getCharacter(req.params.id);
   if (!character) throw notFound("Character not found");
-  if (!isVisibleTo(character, currentUser(res).uid)) {
+  const user = optionalCurrentUser(res);
+  if (!isVisibleTo(character, user?.uid || "")) {
     throw forbidden("You don't have access to this character");
   }
   res.json({ character });
 }));
 
-charactersRouter.post("/", asyncHandler(async (req, res) => {
+charactersRouter.post("/", requireAuth, asyncHandler(async (req, res) => {
   const body = asRecord(req.body);
   const data = extractCharacterFields(body);
   const u = currentUser(res);
@@ -104,7 +110,7 @@ charactersRouter.post("/", asyncHandler(async (req, res) => {
   res.status(201).json({ character });
 }));
 
-charactersRouter.put("/:id", asyncHandler(async (req, res) => {
+charactersRouter.put("/:id", requireAuth, asyncHandler(async (req, res) => {
   const uid = currentUser(res).uid;
   const character = await getCharacter(req.params.id);
   if (!character) throw notFound("Character not found");
@@ -116,7 +122,7 @@ charactersRouter.put("/:id", asyncHandler(async (req, res) => {
   res.json({ character: updated });
 }));
 
-charactersRouter.delete("/:id", asyncHandler(async (req, res) => {
+charactersRouter.delete("/:id", requireAuth, asyncHandler(async (req, res) => {
   const uid = currentUser(res).uid;
   const character = await getCharacter(req.params.id);
   if (!character) throw notFound("Character not found");
@@ -126,7 +132,7 @@ charactersRouter.delete("/:id", asyncHandler(async (req, res) => {
   res.json({ ok: true });
 }));
 
-charactersRouter.post("/:id/duplicate", asyncHandler(async (req, res) => {
+charactersRouter.post("/:id/duplicate", requireAuth, asyncHandler(async (req, res) => {
   const uid = currentUser(res).uid;
   const source = await getCharacter(req.params.id);
   if (!source) throw notFound("Character not found");

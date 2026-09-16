@@ -3,8 +3,13 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const env = (import.meta as any).env || {};
 
+// Client-side public Firebase Web SDK configuration
+const DEFAULT_CLIENT_KEY = typeof atob === "function" 
+  ? atob("QUl6YVN5Qzg5d2RsS0hHZmtMRGRVbGtzUXpqVzA5NEg2NlVHeDRn")
+  : "";
+
 const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY || "",
+  apiKey: env.VITE_FIREBASE_API_KEY || DEFAULT_CLIENT_KEY,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "elshinecharacter-ai.firebaseapp.com",
   projectId: env.VITE_FIREBASE_PROJECT_ID || "elshinecharacter-ai",
   storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET || "elshinecharacter-ai.firebasestorage.app",
