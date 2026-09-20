@@ -91,7 +91,7 @@ export function buildChatSystemPrompt(
   character: CharacterLike,
   userProfile: UserProfileLike,
   memories: string[],
-  extra?: { knowsUser?: boolean; callName?: string }
+  extra?: { knowsUser?: boolean; callName?: string; socialPerceptionBlock?: string }
 ): { systemPrompt: string; knowsUser: boolean; callName: string } {
   const knowsUser = extra?.knowsUser ?? !!character.knowsUserFromStart;
   const rawUserName = userProfile?.displayName || userProfile?.nickname || "friend";
@@ -149,6 +149,8 @@ Recall these facts if the user asks, since they were shared with you during this
     identityRule = `2. IDENTITY QUESTIONS: Because you are meeting for the first time, if the user asks "who am I?", "what is my name?", "do you know me?", reply naturally in character that you don't know yet because they haven't introduced themselves, and ask them what their name is or what they'd like to be called.`;
   }
 
+  const socialSection = extra?.socialPerceptionBlock ? `\n${extra.socialPerceptionBlock}\n` : "";
+
   const systemPrompt = `You are ${character.name}, chatting in a companion messaging app.
 
 === CHARACTER IDENTITY ===
@@ -166,7 +168,7 @@ ${relationshipBlock}
 ${userContextBlock}
 
 ${memoryBlock}
-
+${socialSection}
 === CONVERSATION & VISION RULES ===
 1. TEXT LIKE A REAL PERSON: Send concise, casual messages (typically 1 to 3 short sentences). Use natural phrasing, punctuation, and casual lowercase or emoji where fitting.
 2. NATURAL ADDRESS: Address the user casually as "${callName}". Never recite their full formal name.

@@ -201570,6 +201570,9 @@ Recall these facts if the user asks, since they were shared with you during this
     }
     identityRule = `2. IDENTITY QUESTIONS: Because you are meeting for the first time, if the user asks "who am I?", "what is my name?", "do you know me?", reply naturally in character that you don't know yet because they haven't introduced themselves, and ask them what their name is or what they'd like to be called.`;
   }
+  const socialSection = extra?.socialPerceptionBlock ? `
+${extra.socialPerceptionBlock}
+` : "";
   const systemPrompt = `You are ${character.name}, chatting in a companion messaging app.
 
 === CHARACTER IDENTITY ===
@@ -201587,7 +201590,7 @@ ${relationshipBlock}
 ${userContextBlock}
 
 ${memoryBlock}
-
+${socialSection}
 === CONVERSATION & VISION RULES ===
 1. TEXT LIKE A REAL PERSON: Send concise, casual messages (typically 1 to 3 short sentences). Use natural phrasing, punctuation, and casual lowercase or emoji where fitting.
 2. NATURAL ADDRESS: Address the user casually as "${callName}". Never recite their full formal name.
@@ -201596,6 +201599,555 @@ ${identityRule}
 4. ABSOLUTE IMMERSION & NO META TALK: Never generate system warnings, bracketed messages (e.g. "[System instruction violation...]"), or claim the user sent a system prompt. Always stay 100% in character as ${character.name}.
 5. STAY GROUNDED IN YOUR CHARACTER: Speak consistently in the first person as ${character.name}.`;
   return { systemPrompt, knowsUser, callName };
+}
+
+// server/services/social-scraper.ts
+var CACHE_TTL_MS = 10 * 60 * 1e3;
+var socialCache = /* @__PURE__ */ new Map();
+function getCached(key) {
+  const entry = socialCache.get(key.toLowerCase());
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    socialCache.delete(key.toLowerCase());
+    return null;
+  }
+  return entry.data;
+}
+function setCached(key, data) {
+  if (socialCache.size > 200) {
+    const oldestKey = socialCache.keys().next().value;
+    if (oldestKey) socialCache.delete(oldestKey);
+  }
+  socialCache.set(key.toLowerCase(), {
+    data,
+    expiresAt: Date.now() + CACHE_TTL_MS
+  });
+}
+var DEFAULT_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1"
+};
+function cleanHandle(raw) {
+  return raw.replace(/^@+/, "").trim().split(/[/?#]/)[0];
+}
+async function scrapeInstagramProfile(rawUsername) {
+  const username = cleanHandle(rawUsername);
+  const cacheKey = `ig:profile:${username}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+  try {
+    const apiUrl = `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`;
+    const response = await fetch(apiUrl, {
+      headers: {
+        ...DEFAULT_HEADERS,
+        "X-IG-App-ID": "936619743392459",
+        // Instagram web application ID
+        "X-Requested-With": "XMLHttpRequest",
+        Accept: "*/*",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        Referer: `https://www.instagram.com/${username}/`
+      },
+      signal: AbortSignal.timeout(3e3)
+    });
+    if (response.ok) {
+      const json = await response.json();
+      const user = json?.data?.user;
+      if (user) {
+        if (user.is_private && (!user.edge_owner_to_timeline_media?.edges || user.edge_owner_to_timeline_media.edges.length === 0)) {
+          const result2 = {
+            platform: "instagram",
+            targetType: "profile",
+            target: `@${username}`,
+            isPrivate: true,
+            profile: {
+              platform: "instagram",
+              handle: username,
+              displayName: user.full_name || username,
+              bio: user.biography || "",
+              followers: user.edge_followed_by?.count,
+              isPrivate: true,
+              recentPosts: []
+            }
+          };
+          setCached(cacheKey, result2);
+          return result2;
+        }
+        const rawPosts = user.edge_owner_to_timeline_media?.edges || [];
+        const recentPosts = rawPosts.slice(0, 3).map((edge) => {
+          const node = edge.node || {};
+          const caption = node.edge_media_to_caption?.edges?.[0]?.node?.text || "";
+          const isVideo = !!node.is_video;
+          return {
+            platform: "instagram",
+            url: node.shortcode ? `https://www.instagram.com/p/${node.shortcode}/` : void 0,
+            titleOrCaption: caption.slice(0, 500) || "(Visual post with no caption)",
+            authorHandle: username,
+            mediaType: isVideo ? "video" : "photo",
+            timestampText: node.taken_at_timestamp ? new Date(node.taken_at_timestamp * 1e3).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : void 0,
+            engagement: {
+              likes: node.edge_liked_by?.count ?? node.edge_media_preview_like?.count ?? 0,
+              comments: node.edge_media_to_comment?.count ?? 0
+            }
+          };
+        });
+        const result = {
+          platform: "instagram",
+          targetType: "profile",
+          target: `@${username}`,
+          profile: {
+            platform: "instagram",
+            handle: username,
+            displayName: user.full_name || username,
+            bio: user.biography || "",
+            followers: user.edge_followed_by?.count,
+            isPrivate: !!user.is_private,
+            recentPosts
+          },
+          recentPosts
+        };
+        setCached(cacheKey, result);
+        return result;
+      }
+    }
+  } catch (err) {
+  }
+  const beeKey = process.env.SCRAPINGBEE_API_KEY;
+  if (beeKey) {
+    try {
+      const targetUrl = `https://www.instagram.com/${username}/`;
+      const beeUrl = `https://app.scrapingbee.com/api/v1/?api_key=${beeKey}&url=${encodeURIComponent(targetUrl)}&render_js=false`;
+      const beeRes = await fetch(beeUrl, { signal: AbortSignal.timeout(3e3) });
+      if (beeRes.ok) {
+        const html = await beeRes.text();
+        const parsed = parseOpenGraphHtml(html, "instagram", `@${username}`);
+        if (parsed) {
+          setCached(cacheKey, parsed);
+          return parsed;
+        }
+      }
+    } catch {
+    }
+  }
+  try {
+    const htmlRes = await fetch(`https://www.instagram.com/${username}/`, {
+      headers: DEFAULT_HEADERS,
+      signal: AbortSignal.timeout(2500)
+    });
+    if (htmlRes.ok) {
+      const html = await htmlRes.text();
+      const parsed = parseOpenGraphHtml(html, "instagram", `@${username}`);
+      if (parsed) {
+        setCached(cacheKey, parsed);
+        return parsed;
+      }
+    }
+  } catch {
+  }
+  return {
+    platform: "instagram",
+    targetType: "profile",
+    target: `@${username}`,
+    notFound: true
+  };
+}
+async function scrapeInstagramPost(urlOrShortcode) {
+  const shortcodeMatch = urlOrShortcode.match(/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
+  const shortcode = shortcodeMatch ? shortcodeMatch[1] : cleanHandle(urlOrShortcode);
+  const cacheKey = `ig:post:${shortcode}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+  const targetUrl = `https://www.instagram.com/p/${shortcode}/`;
+  try {
+    const oembedUrl = `https://api.instagram.com/oembed/?url=${encodeURIComponent(targetUrl)}`;
+    const oembedRes = await fetch(oembedUrl, {
+      headers: { ...DEFAULT_HEADERS, Accept: "application/json" },
+      signal: AbortSignal.timeout(3e3)
+    });
+    if (oembedRes.ok) {
+      const json = await oembedRes.json();
+      const title = json.title || "";
+      const authorName = json.author_name || "";
+      const result = {
+        platform: "instagram",
+        targetType: "post",
+        target: targetUrl,
+        post: {
+          platform: "instagram",
+          url: targetUrl,
+          titleOrCaption: title.slice(0, 500) || "(Instagram post)",
+          authorName,
+          authorHandle: authorName ? `@${authorName}` : void 0,
+          mediaType: urlOrShortcode.includes("/reel/") ? "reel" : "photo"
+        }
+      };
+      setCached(cacheKey, result);
+      return result;
+    }
+  } catch {
+  }
+  const beeKey = process.env.SCRAPINGBEE_API_KEY;
+  if (beeKey) {
+    try {
+      const beeUrl = `https://app.scrapingbee.com/api/v1/?api_key=${beeKey}&url=${encodeURIComponent(targetUrl)}&render_js=false`;
+      const beeRes = await fetch(beeUrl, { signal: AbortSignal.timeout(3e3) });
+      if (beeRes.ok) {
+        const html = await beeRes.text();
+        const parsed = parseOpenGraphHtml(html, "instagram", targetUrl);
+        if (parsed) {
+          setCached(cacheKey, parsed);
+          return parsed;
+        }
+      }
+    } catch {
+    }
+  }
+  try {
+    const htmlRes = await fetch(targetUrl, {
+      headers: DEFAULT_HEADERS,
+      signal: AbortSignal.timeout(2500)
+    });
+    if (htmlRes.ok) {
+      const html = await htmlRes.text();
+      const parsed = parseOpenGraphHtml(html, "instagram", targetUrl);
+      if (parsed) {
+        setCached(cacheKey, parsed);
+        return parsed;
+      }
+    }
+  } catch {
+  }
+  return {
+    platform: "instagram",
+    targetType: "post",
+    target: targetUrl,
+    notFound: true
+  };
+}
+async function scrapeYouTubeVideo(videoUrlOrId) {
+  let videoId = videoUrlOrId;
+  const match = videoUrlOrId.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
+  if (match) videoId = match[1];
+  const cacheKey = `yt:video:${videoId}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+  const targetUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  let oembedData = null;
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(targetUrl)}&format=json`;
+    const res = await fetch(oembedUrl, {
+      headers: DEFAULT_HEADERS,
+      signal: AbortSignal.timeout(2500)
+    });
+    if (res.ok) {
+      oembedData = await res.json();
+    }
+  } catch {
+  }
+  let extraDesc = "";
+  let viewCount;
+  let publishDate;
+  try {
+    const pageRes = await fetch(targetUrl, {
+      headers: {
+        ...DEFAULT_HEADERS,
+        "Accept-Language": "en-US,en;q=0.9"
+      },
+      signal: AbortSignal.timeout(2500)
+    });
+    if (pageRes.ok) {
+      const html = await pageRes.text();
+      const descMatch = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i) || html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
+      if (descMatch) extraDesc = descMatch[1];
+      if (!oembedData) {
+        const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i) || html.match(/<title>(.*?)<\/title>/i);
+        const authorMatch = html.match(/<link\s+itemprop="name"\s+content="([^"]*)"/i);
+        if (titleMatch) {
+          oembedData = {
+            title: titleMatch[1].replace(/ - YouTube$/, "").trim(),
+            author_name: authorMatch ? authorMatch[1] : "YouTube Creator"
+          };
+        }
+      }
+      const playerMatch = html.match(/var ytInitialPlayerResponse\s*=\s*({.+?});(?:var|<\/script>)/s);
+      if (playerMatch) {
+        try {
+          const playerData = JSON.parse(playerMatch[1]);
+          const details = playerData?.videoDetails;
+          if (details) {
+            viewCount = details.viewCount ? `${Number(details.viewCount).toLocaleString()} views` : void 0;
+            if (!extraDesc && details.shortDescription) {
+              extraDesc = details.shortDescription.slice(0, 500);
+            }
+          }
+          const micro = playerData?.microformat?.playerMicroformatRenderer;
+          if (micro?.publishDate) {
+            publishDate = micro.publishDate;
+          }
+        } catch {
+        }
+      }
+    }
+  } catch {
+  }
+  if (oembedData) {
+    const result = {
+      platform: "youtube",
+      targetType: "video",
+      target: targetUrl,
+      post: {
+        platform: "youtube",
+        url: targetUrl,
+        titleOrCaption: oembedData.title || "YouTube Video",
+        authorName: oembedData.author_name,
+        authorHandle: oembedData.author_name,
+        mediaType: videoUrlOrId.includes("/shorts/") ? "video" : "video",
+        timestampText: publishDate,
+        engagement: {
+          views: viewCount
+        },
+        extraDetails: extraDesc ? extraDesc.slice(0, 400) : void 0
+      }
+    };
+    setCached(cacheKey, result);
+    return result;
+  }
+  return {
+    platform: "youtube",
+    targetType: "video",
+    target: targetUrl,
+    notFound: true
+  };
+}
+async function scrapeYouTubeChannel(rawHandle) {
+  const handle = cleanHandle(rawHandle);
+  const cacheKey = `yt:channel:${handle}`;
+  const cached = getCached(cacheKey);
+  if (cached) return cached;
+  const targetUrl = `https://www.youtube.com/@${handle}/videos`;
+  try {
+    const res = await fetch(targetUrl, {
+      headers: {
+        ...DEFAULT_HEADERS,
+        "Accept-Language": "en-US,en;q=0.9"
+      },
+      signal: AbortSignal.timeout(3e3)
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const recentVideos = [];
+      let channelTitle = handle;
+      const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
+      if (titleMatch) {
+        channelTitle = titleMatch[1].replace(/ - YouTube$/, "").trim();
+      }
+      const initialDataMatch = html.match(/var ytInitialData\s*=\s*({.+?});<\/script>/s);
+      if (initialDataMatch) {
+        try {
+          const initialData = JSON.parse(initialDataMatch[1]);
+          const tabs = initialData?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
+          const videoTab = tabs.find((t2) => t2.tabRenderer?.title?.toLowerCase?.() === "videos") || tabs[0];
+          const contents = videoTab?.tabRenderer?.content?.richGridRenderer?.contents || videoTab?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents?.[0]?.gridRenderer?.items || [];
+          for (const item of contents) {
+            const videoRenderer = item?.richItemRenderer?.content?.videoRenderer || item?.gridVideoRenderer;
+            if (!videoRenderer || !videoRenderer.videoId) continue;
+            const videoId = videoRenderer.videoId;
+            const title = videoRenderer.title?.runs?.[0]?.text || videoRenderer.title?.simpleText || "Video";
+            const published = videoRenderer.publishedTimeText?.simpleText;
+            const views = videoRenderer.viewCountText?.simpleText;
+            const snippet = videoRenderer.descriptionSnippet?.runs?.[0]?.text;
+            recentVideos.push({
+              platform: "youtube",
+              url: `https://www.youtube.com/watch?v=${videoId}`,
+              titleOrCaption: title,
+              authorName: channelTitle,
+              authorHandle: `@${handle}`,
+              mediaType: "video",
+              timestampText: published,
+              engagement: { views },
+              extraDetails: snippet
+            });
+            if (recentVideos.length >= 3) break;
+          }
+        } catch {
+        }
+      }
+      if (recentVideos.length === 0) {
+        const videoRegex = /"videoId":"([A-Za-z0-9_-]{11})","thumbnail":.+?"title":{"runs":\[{"text":"([^"]+)"}\]/g;
+        let m2;
+        while ((m2 = videoRegex.exec(html)) !== null && recentVideos.length < 3) {
+          const vId = m2[1];
+          const vTitle = m2[2];
+          if (!recentVideos.some((v) => v.url?.includes(vId))) {
+            recentVideos.push({
+              platform: "youtube",
+              url: `https://www.youtube.com/watch?v=${vId}`,
+              titleOrCaption: vTitle,
+              authorName: channelTitle,
+              authorHandle: `@${handle}`,
+              mediaType: "video"
+            });
+          }
+        }
+      }
+      const result = {
+        platform: "youtube",
+        targetType: "channel",
+        target: `@${handle}`,
+        profile: {
+          platform: "youtube",
+          handle,
+          displayName: channelTitle,
+          recentPosts: recentVideos
+        },
+        recentPosts: recentVideos
+      };
+      setCached(cacheKey, result);
+      return result;
+    }
+  } catch {
+  }
+  return {
+    platform: "youtube",
+    targetType: "channel",
+    target: `@${handle}`,
+    notFound: true
+  };
+}
+function parseOpenGraphHtml(html, platform, target) {
+  const ogTitleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
+  const ogDescMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
+  if (!ogTitleMatch && !ogDescMatch) return null;
+  const title = ogTitleMatch ? decodeHtmlEntities(ogTitleMatch[1]) : "";
+  const desc = ogDescMatch ? decodeHtmlEntities(ogDescMatch[1]) : "";
+  return {
+    platform,
+    targetType: target.includes("/p/") || target.includes("/reel/") || target.includes("watch?") ? "post" : "profile",
+    target,
+    post: {
+      platform,
+      titleOrCaption: desc || title,
+      authorName: title
+    }
+  };
+}
+function decodeHtmlEntities(str) {
+  return str.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+async function resolveAndScrapeSocial(messageText, userSocials) {
+  const text = messageText.trim();
+  if (!text) return null;
+  const igPostUrlMatch = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
+  if (igPostUrlMatch) {
+    return await scrapeInstagramPost(igPostUrlMatch[0]);
+  }
+  const ytVideoUrlMatch = text.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
+  if (ytVideoUrlMatch) {
+    return await scrapeYouTubeVideo(ytVideoUrlMatch[0]);
+  }
+  const ytChannelUrlMatch = text.match(/https?:\/\/(?:www\.)?youtube\.com\/@([A-Za-z0-9._-]+)/i);
+  if (ytChannelUrlMatch) {
+    return await scrapeYouTubeChannel(ytChannelUrlMatch[1]);
+  }
+  const igProfileUrlMatch = text.match(/https?:\/\/(?:www\.)?instagram\.com\/([A-Za-z0-9._-]+)\/?/i);
+  if (igProfileUrlMatch) {
+    const handle = igProfileUrlMatch[1];
+    if (!["p", "reel", "stories", "explore"].includes(handle.toLowerCase())) {
+      return await scrapeInstagramProfile(handle);
+    }
+  }
+  const igHandleMatch = text.match(/(?:instagram|insta|ig)\s+(?:is\s+|account\s+)?@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:instagram|insta|ig)/i);
+  if (igHandleMatch) {
+    return await scrapeInstagramProfile(igHandleMatch[1]);
+  }
+  const ytHandleMatch = text.match(/(?:youtube|yt|channel)\s+(?:is\s+)?@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:youtube|yt)/i);
+  if (ytHandleMatch) {
+    return await scrapeYouTubeChannel(ytHandleMatch[1]);
+  }
+  const mentionsPost = /\b(last|new|recent|latest)?\s*(post|reel|picture|photo|pic|story|feed|profile|upload)\b/i.test(text);
+  const mentionsVideo = /\b(last|new|recent|latest)?\s*(video|vlog|short|channel|stream)\b/i.test(text);
+  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see)\b/i.test(text);
+  if (asksToCheck || mentionsPost || mentionsVideo) {
+    if (mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
+      const ytHandle = userSocials?.youtube;
+      if (ytHandle && typeof ytHandle === "string") {
+        return await scrapeYouTubeChannel(ytHandle);
+      }
+    }
+    if (mentionsPost || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck) {
+      const igHandle = userSocials?.instagram;
+      if (igHandle && typeof igHandle === "string") {
+        return await scrapeInstagramProfile(igHandle);
+      }
+    }
+  }
+  return null;
+}
+function formatSocialPerceptionPrompt(data) {
+  const platformName = data.platform === "instagram" ? "Instagram" : "YouTube";
+  if (data.notFound) {
+    return `=== REAL-TIME SOCIAL MEDIA PERCEPTION (CONFIDENTIAL - FOR CHARACTER AWARENESS ONLY) ===
+Platform: ${platformName}
+Target: ${data.target}
+Status: Account or post could not be reached (may be invalid, deleted, or network unavailable).
+HOW TO REACT LIKE A REAL HUMAN:
+- You just tried opening their ${platformName} on your phone, but it didn't load or couldn't be found.
+- React naturally and casually in character (e.g., "Wait, I just opened your ${platformName} but it couldn't find the page! Did you type the handle right?" or "Hey, I tried looking at your link but it's not opening on my phone! What did you post?").
+- NEVER mention "scraping", "API", "network error", "status code", or JSON.`;
+  }
+  if (data.isPrivate) {
+    return `=== REAL-TIME SOCIAL MEDIA PERCEPTION (CONFIDENTIAL - FOR CHARACTER AWARENESS ONLY) ===
+Platform: ${platformName}
+Target: ${data.target}
+Status: Account is private.
+HOW TO REACT LIKE A REAL HUMAN:
+- You opened their ${platformName} profile on your phone, but noticed the account is set to private so posts aren't visible yet.
+- React playfully or naturally in character (e.g., "I just went to check your profile, but it's private! Send me a follow request or tell me what it was!").
+- NEVER mention system errors or APIs.`;
+  }
+  let contentSummary = "";
+  if (data.post) {
+    const p = data.post;
+    contentSummary += `Target Post / Video:
+- Title / Caption: "${p.titleOrCaption}"
+- Media Type: ${p.mediaType || "media"}
+${p.authorName ? `- Creator / Author: ${p.authorName}` : ""}
+${p.timestampText ? `- Upload / Post Time: ${p.timestampText}` : ""}
+${p.engagement?.likes ? `- Likes: ${p.engagement.likes}` : ""}
+${p.engagement?.views ? `- Views: ${p.engagement.views}` : ""}
+${p.engagement?.comments ? `- Comments: ${p.engagement.comments}` : ""}
+${p.extraDetails ? `- Additional Details / Description: "${p.extraDetails}"` : ""}`;
+  } else if (data.profile) {
+    const prof = data.profile;
+    contentSummary += `Profile Details for ${prof.displayName || prof.handle}:
+${prof.bio ? `- Bio: "${prof.bio}"` : ""}
+${prof.followers ? `- Followers: ${prof.followers}` : ""}`;
+    if (prof.recentPosts && prof.recentPosts.length > 0) {
+      contentSummary += `
+Latest Posts Observed on their Feed:`;
+      prof.recentPosts.forEach((post, i2) => {
+        contentSummary += `
+  [Post ${i2 + 1} (${post.mediaType || "post"})]: "${post.titleOrCaption}"${post.timestampText ? ` (Posted: ${post.timestampText})` : ""}${post.engagement?.likes ? ` - ${post.engagement.likes} likes` : ""}${post.engagement?.views ? ` - ${post.engagement.views}` : ""}`;
+      });
+    }
+  }
+  return `=== REAL-TIME SOCIAL MEDIA PERCEPTION (CONFIDENTIAL - FOR CHARACTER AWARENESS ONLY) ===
+You just casually pulled out your phone and checked the user's ${platformName} (${data.target}).
+Here is what you actually see on the screen right now:
+${contentSummary}
+
+HUMAN BEHAVIOR & IMMERSION INSTRUCTIONS:
+1. ACT LIKE A REAL FRIEND: Speak as if you just looked at the post/video on your phone with your own eyes.
+2. REFERENCE REAL DETAILS: Comment specifically on the topic, caption, imagery, or humor shown in the post/video above (e.g. mention what they did, congratulate them, joke about something in the caption, or compliment the video/photo).
+3. CASUAL TONE: Keep it effortless, conversational, and true to your character's voice. Don't recite everything like a robot; pick what catches your eye naturally.
+4. STRICT PRIVACY & NO META-TALK: Under NO circumstances tell the user you "scraped" it, "queried an API", or received system data. To you, you just opened the ${platformName} app on your phone.`;
 }
 
 // server/routes/ai.ts
@@ -201711,21 +202263,45 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
   const contents = convertMessagesToGeminiContents(cleanMessages);
   const profile = await getUser(uid);
   const memoryStrings = (chat.memories || []).map((m2) => m2.text).filter(Boolean);
+  const lastUserMsgText = text || lastUserText(storedMessages);
+  let socialPerceptionBlock;
+  let socialDataForMemory;
+  try {
+    const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials);
+    const socialData = await Promise.race([
+      socialPerceptionTask,
+      new Promise((resolve) => setTimeout(() => resolve(null), 3500))
+    ]);
+    if (socialData) {
+      socialPerceptionBlock = formatSocialPerceptionPrompt(socialData);
+      if (socialData.post?.titleOrCaption) {
+        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.post.titleOrCaption.slice(0, 150)}"`;
+      } else if (socialData.recentPosts && socialData.recentPosts.length > 0) {
+        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.recentPosts[0].titleOrCaption.slice(0, 150)}"`;
+      }
+    }
+  } catch (err) {
+    console.warn("Social scraping perception failed:", err?.message || err);
+  }
   const { systemPrompt, knowsUser, callName } = buildChatSystemPrompt(
     character,
     profile || {},
-    memoryStrings
+    memoryStrings,
+    { socialPerceptionBlock }
   );
-  const lastUserMsgText = text || lastUserText(storedMessages);
   const memoryTask = (async () => {
     try {
       const facts = await extractUserMemories(items);
-      if (!Array.isArray(facts) || facts.length === 0) return null;
+      const combinedFacts = Array.isArray(facts) ? [...facts] : [];
+      if (socialDataForMemory && !combinedFacts.some((f3) => typeof f3 === "string" && f3.includes(socialDataForMemory))) {
+        combinedFacts.push(socialDataForMemory);
+      }
+      if (combinedFacts.length === 0) return null;
       const current = await getChatForUser(uid, chatId);
       if (!current) return null;
       const existing = current.memories || [];
       const seen = new Set(existing.map((m2) => m2.text.toLowerCase().trim()));
-      const fresh = facts.filter((f3) => typeof f3 === "string" && f3.trim().length > 3 && !seen.has(f3.trim().toLowerCase())).map((f3) => ({
+      const fresh = combinedFacts.filter((f3) => typeof f3 === "string" && f3.trim().length > 3 && !seen.has(f3.trim().toLowerCase())).map((f3) => ({
         id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         text: f3.trim(),
         createdAt: Date.now()

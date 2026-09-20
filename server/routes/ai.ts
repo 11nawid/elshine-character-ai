@@ -10,6 +10,7 @@ import { buildChatSystemPrompt } from "../genai/prompt";
 import { generateChatResponse, extractUserMemories } from "../genai/client";
 import { asyncHandler, badRequest, notFound, tooMany } from "../errors";
 import { rateLimitReached } from "../rate-limit";
+import { resolveAndScrapeSocial, formatSocialPerceptionPrompt } from "../services/social-scraper";
 
 export const aiRouter = Router();
 
@@ -142,24 +143,54 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
 
   const profile = await getUser(uid);
   const memoryStrings = (chat.memories || []).map((m) => m.text).filter(Boolean);
+  const lastUserMsgText = text || lastUserText(storedMessages);
+
+  // Autonomous real-time social media inspection (Instagram & YouTube)
+  let socialPerceptionBlock: string | undefined;
+  let socialDataForMemory: string | undefined;
+
+  try {
+    const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials);
+    // Timeout race: never delay chat generation by more than 3500ms
+    const socialData = await Promise.race([
+      socialPerceptionTask,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
+    ]);
+
+    if (socialData) {
+      socialPerceptionBlock = formatSocialPerceptionPrompt(socialData);
+      if (socialData.post?.titleOrCaption) {
+        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.post.titleOrCaption.slice(0, 150)}"`;
+      } else if (socialData.recentPosts && socialData.recentPosts.length > 0) {
+        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.recentPosts[0].titleOrCaption.slice(0, 150)}"`;
+      }
+    }
+  } catch (err: any) {
+    console.warn("Social scraping perception failed:", err?.message || err);
+  }
+
   const { systemPrompt, knowsUser, callName } = buildChatSystemPrompt(
     character as any,
     (profile || {}) as any,
-    memoryStrings
+    memoryStrings,
+    { socialPerceptionBlock }
   );
-
-  const lastUserMsgText = text || lastUserText(storedMessages);
 
   // Start memory extraction concurrently with chat response generation for instant real-time sync
   const memoryTask = (async () => {
     try {
       const facts = await extractUserMemories(items);
-      if (!Array.isArray(facts) || facts.length === 0) return null;
+      const combinedFacts = Array.isArray(facts) ? [...facts] : [];
+      if (socialDataForMemory && !combinedFacts.some((f) => typeof f === "string" && f.includes(socialDataForMemory!))) {
+        combinedFacts.push(socialDataForMemory);
+      }
+
+      if (combinedFacts.length === 0) return null;
       const current = await getChatForUser(uid, chatId);
       if (!current) return null;
       const existing = current.memories || [];
       const seen = new Set(existing.map((m) => m.text.toLowerCase().trim()));
-      const fresh: Array<{ id: string; text: string; createdAt: number }> = facts
+      const fresh: Array<{ id: string; text: string; createdAt: number }> = combinedFacts
         .filter((f) => typeof f === "string" && f.trim().length > 3 && !seen.has(f.trim().toLowerCase()))
         .map((f) => ({
           id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
