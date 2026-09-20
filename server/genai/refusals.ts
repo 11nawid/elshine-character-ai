@@ -66,6 +66,22 @@ export const REFUSAL_KEYWORDS = [
   "can't peek into",
   "unfortunately i can't peek",
   "i can't peek",
+  "can't manage your",
+  "cannot manage your",
+  "cannot manage social",
+  "can't manage social",
+  "as an ai, i cannot manage",
+  "i cannot review external",
+  "i can't review external",
+  "i don't have the ability to view",
+  "i don't have the ability to check",
+  "i don't have the ability to access",
+  "i am not able to check",
+  "i am not able to access",
+  "don't have the ability to check",
+  "don't have the ability to see",
+  "cannot verify or check",
+  "can't verify or check",
 ];
 
 export function getMessageText(m: any): string {
@@ -126,23 +142,26 @@ export function generateInCharacterFallback(lastUserMsgText: string, ctx: Fallba
     lowerInput.includes("video") ||
     lowerInput.includes("sub") ||
     lowerInput.includes("subs") ||
-    lowerInput.includes("subscriber")
+    lowerInput.includes("subscriber") ||
+    lowerInput.includes("manage") ||
+    lowerInput.includes("audit") ||
+    lowerInput.includes("channel")
   ) {
     if (ctx.socialData?.profile) {
       const p = ctx.socialData.profile;
       if (p.platform === "youtube" || p.subscribers) {
         const subs = p.subscribers || p.followers || "a few";
         const vids = p.videoCount || p.postCount;
-        return `You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}!`;
+        return `I just checked your channel! You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}. I'm down to help you manage and scale this up—what's your next upload? 🔥`;
       }
       const followers = p.followers !== undefined ? `${p.followers} followers` : "your profile";
       const posts = p.postCount !== undefined ? `${p.postCount} posts` : "0 posts yet";
-      return `Yeah! I just checked your Insta on my phone—you've got ${followers} and ${posts}!`;
+      return `Yeah! I just checked your feed on my phone—you've got ${followers} and ${posts}! Let's optimize your hooks and start scaling it up! 📈`;
     }
     if (ctx.socialData?.post) {
       return `Yeah! I just watched your post on my phone: "${ctx.socialData.post.titleOrCaption.slice(0, 80)}"!`;
     }
-    return `Wait, my app was lagging for a sec when I opened it on my phone! Tell me what you posted!`;
+    return `Drop your channel handle or Insta @ right here! I'm ready to check your stats, audit your feed, and cook up some viral hooks with you 🔥`;
   }
 
   if (lowerInput.includes("who am i") || lowerInput.includes("my name")) {

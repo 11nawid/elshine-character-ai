@@ -91,6 +91,7 @@ export interface Character {
   };
   createdAt: number;
   updatedAt?: number;
+  isPinned?: boolean;
 }
 
 export interface Memory {

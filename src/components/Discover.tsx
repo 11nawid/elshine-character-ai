@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Heart, MessageSquare, ArrowRight, X, Plus } from 'lucide-react';
+import { Search, Heart, MessageSquare, ArrowRight, X, Plus, Pin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Character } from '../types';
 import { cn } from '../lib/utils';
@@ -60,6 +60,9 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
 
     return matchesSearch && matchesFilter;
   }).sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+
     if (activeFilter === 'Popular') {
       return (b.stats?.likes || 0) - (a.stats?.likes || 0);
     }
@@ -142,7 +145,12 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, delay: Math.min(index * 0.02, 0.3) }}
-                className="group flex flex-col bg-white border border-zinc-200/70 rounded-2xl overflow-hidden hover:border-zinc-300 hover:shadow-md transition-all duration-300"
+                className={cn(
+                  "group flex flex-col bg-white border rounded-2xl overflow-hidden transition-all duration-300",
+                  char.isPinned 
+                    ? "border-amber-400/80 shadow-md ring-1 ring-amber-400/40 hover:shadow-lg hover:border-amber-500" 
+                    : "border-zinc-200/70 hover:border-zinc-300 hover:shadow-md"
+                )}
               >
                 <div 
                   onClick={() => handleChat(char.id)}
@@ -158,6 +166,11 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
 
                   {/* Top Badges */}
                   <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                    {char.isPinned && (
+                      <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs flex items-center gap-1">
+                        <Pin className="w-2.5 h-2.5 fill-white rotate-45" /> Pinned
+                      </span>
+                    )}
                     {char.rating === 'mature' && (
                       <span className="bg-black/70 backdrop-blur-xs text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                         18+

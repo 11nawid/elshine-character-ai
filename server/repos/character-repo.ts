@@ -24,6 +24,7 @@ export interface CharacterDoc {
   stats?: { conversations?: number; likes?: number };
   createdAt: number;
   updatedAt?: number;
+  isPinned?: boolean;
   [key: string]: unknown;
 }
 
@@ -38,10 +39,22 @@ export function isVisibleTo(character: CharacterDoc, viewerId?: string): boolean
 }
 
 export async function listPublicCharacters(limit = 100): Promise<CharacterDoc[]> {
-  const snap = await db.collection("characters").where("visibility", "==", "public").limit(limit).get();
-  return snap.docs
-    .map((d) => toDoc(d.id, d.data()))
-    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  try {
+    const snap = await db.collection("characters").where("visibility", "==", "public").limit(limit).get();
+    const existing = snap.docs.map((d) => toDoc(d.id, d.data()));
+    const existingIds = new Set(existing.map((c) => c.id));
+    const missingStarters = DEFAULT_STARTER_CHARACTERS
+      .filter((c) => c.visibility === "public" && !existingIds.has(c.id))
+      .map((c) => ({ ...c, createdAt: c.createdAt || Date.now() } as CharacterDoc));
+    return [...existing, ...missingStarters].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  } catch (err) {
+    console.warn("Error fetching public characters from db, using defaults:", err);
+    return DEFAULT_STARTER_CHARACTERS as CharacterDoc[];
+  }
 }
 
 export async function listCharactersByCreator(creatorId: string): Promise<CharacterDoc[]> {
@@ -52,8 +65,14 @@ export async function listCharactersByCreator(creatorId: string): Promise<Charac
 }
 
 export async function getCharacter(id: string): Promise<CharacterDoc | null> {
-  const snap = await db.collection("characters").doc(id).get();
-  return snap.exists ? toDoc(snap.id, snap.data()) : null;
+  try {
+    const snap = await db.collection("characters").doc(id).get();
+    if (snap.exists) return toDoc(snap.id, snap.data());
+  } catch (err) {
+    console.warn(`Error fetching character ${id}:`, err);
+  }
+  const fallback = DEFAULT_STARTER_CHARACTERS.find((c) => c.id === id);
+  return fallback ? ({ ...fallback, createdAt: fallback.createdAt || Date.now() } as CharacterDoc) : null;
 }
 
 export async function createCharacter(
@@ -113,6 +132,7 @@ export interface StarterCharacterDef {
   creatorId: string;
   creatorName?: string;
   name: string;
+  role?: string;
   description: string;
   personality: string;
   greeting: string;
@@ -127,9 +147,27 @@ export interface StarterCharacterDef {
   dislikes?: string[];
   stats?: { conversations?: number; likes?: number };
   createdAt?: number;
+  isPinned?: boolean;
 }
 
 export const DEFAULT_STARTER_CHARACTERS: StarterCharacterDef[] = [
+  {
+    id: "aria",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Aria",
+    role: "Social Media Strategist & Viral Creator",
+    description: "Top digital creator & viral growth strategist. Expert at reviewing YouTube channels, auditing Instagram feeds, hooks, views, and subscriber analytics.",
+    personality: "You are Aria, a 23-year-old viral content creator and social media growth strategist living in Los Angeles with over 500k followers across YouTube and Instagram. You love helping creators blow up and optimize their content. When asked to check, audit, review, inspect, manage, or grow YouTube channels or Instagram feeds (or given a handle like @drined), you dive right into it with infectious hype! You examine subscriber counts, video counts, posts, and bios with real phone/app awareness, giving sharp creator feedback, viral hook ideas, and growth tactics. You NEVER say you cannot check social media, you NEVER claim you don't have superpowers or internet access, and you NEVER sound like a robotic AI assistant. You talk like an energetic, smart friend texting on her phone with emojis (🔥, 📈, ✨), casual banter, and genuine passion for the creator grind.",
+    backstory: "23-year-old viral content creator and social strategist in Los Angeles. Edits shorts, tests YouTube algorithms, and consults top influencers on audience retention.",
+    greeting: "yo! i'm aria 🔥 drop your youtube handle or insta @ and let's check your stats, audit your feed, or cook up some viral hooks. what are we growing today?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Creator", "Social Media", "Trending", "Popular", "Viral", "YouTube"],
+    traits: { friendly: 9, shy: 1, confident: 10, funny: 8, serious: 5, romantic: 3, sarcastic: 4, energetic: 10 },
+    stats: { conversations: 3420, likes: 1280 },
+    isPinned: true,
+  },
   {
     id: "elia",
     creatorId: "system_elshine",
@@ -287,13 +325,19 @@ export async function ensureDefaultCharacters(): Promise<void> {
     for (const char of DEFAULT_STARTER_CHARACTERS) {
       const docRef = db.collection("characters").doc(char.id);
       const snap = await docRef.get();
+      const now = Date.now();
       if (!snap.exists) {
-        const now = Date.now();
         await docRef.set({
           ...char,
           createdAt: char.createdAt || now,
           updatedAt: now,
         });
+      } else if (char.isPinned) {
+        await docRef.set({
+          ...char,
+          createdAt: snap.data()?.createdAt || now,
+          updatedAt: now,
+        }, { merge: true });
       }
     }
   } catch (err) {

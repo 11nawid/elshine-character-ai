@@ -53,12 +53,24 @@ export async function resolveAndScrapeSocial(
     || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:youtube|yt)/i);
   if (ytHandleMatch) return await scrapeYouTubeChannel(ytHandleMatch[1]);
 
+  // 5b. Action verb + handle (e.g. "check @drined", "audit @drined", "manage @drined")
+  const actionHandleMatch = text.match(
+    /(?:check|audit|review|manage|look\s+at|analyze|inspect|see|view|rate|grow)\s+(?:out\s+)?(?:channel\s+|page\s+|account\s+)?@([A-Za-z0-9._-]+)/i
+  );
+  if (actionHandleMatch) {
+    const handle = actionHandleMatch[1];
+    const ytRes = await scrapeYouTubeChannel(handle);
+    if (ytRes) return ytRes;
+    const igRes = await scrapeInstagramProfile(handle);
+    if (igRes) return igRes;
+  }
+
   // 6. Conversational requests referencing user's posts, subscribers, or profile -> fallback to profile socials or chat history!
   const mentionsPost = /\b(last|new|recent|latest)?\s*(post|reel|picture|photo|pic|story|feed|upload)\b/i.test(text);
   const mentionsVideo = /\b(last|new|recent|latest)?\s*(video|vlog|short|channel|stream)\b/i.test(text);
   const mentionsSubs = /\b(subs?|subscribers?|sub\s*count)\b/i.test(text);
-  const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|stats?)\b/i.test(text);
-  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
+  const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|channel|socials?|social\s*media|stats?)\b/i.test(text);
+  const asksToCheck = /\b(check|audit|review|manage|analyze|grow|rate|inspect|critique|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
 
   if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile || mentionsSubs) {
     if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {

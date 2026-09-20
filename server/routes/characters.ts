@@ -4,6 +4,7 @@ import {
   createCharacter,
   deleteCharacter,
   duplicateCharacter,
+  ensureDefaultCharacters,
   getCharacter,
   isVisibleTo,
   listCharactersByCreator,
@@ -79,7 +80,16 @@ async function creatorNameFor(uid: string, fallback?: string): Promise<string> {
   return user?.displayName || fallback || "Anonymous";
 }
 
+let seeded = false;
+function lazySeedDefaults(): void {
+  if (!seeded) {
+    seeded = true;
+    ensureDefaultCharacters().catch((err) => console.warn("Seed error:", err));
+  }
+}
+
 charactersRouter.get("/", optionalAuth, asyncHandler(async (req, res) => {
+  lazySeedDefaults();
   const scope = req.query.scope === "mine" ? "mine" : "public";
   if (scope === "mine") {
     const user = optionalCurrentUser(res);

@@ -200432,16 +200432,34 @@ function isVisibleTo(character, viewerId) {
   return character.visibility === "public" || character.visibility === "unlisted" || character.creatorId === viewerId;
 }
 async function listPublicCharacters(limit = 100) {
-  const snap = await db.collection("characters").where("visibility", "==", "public").limit(limit).get();
-  return snap.docs.map((d) => toDoc(d.id, d.data())).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  try {
+    const snap = await db.collection("characters").where("visibility", "==", "public").limit(limit).get();
+    const existing = snap.docs.map((d) => toDoc(d.id, d.data()));
+    const existingIds = new Set(existing.map((c) => c.id));
+    const missingStarters = DEFAULT_STARTER_CHARACTERS.filter((c) => c.visibility === "public" && !existingIds.has(c.id)).map((c) => ({ ...c, createdAt: c.createdAt || Date.now() }));
+    return [...existing, ...missingStarters].sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
+  } catch (err) {
+    console.warn("Error fetching public characters from db, using defaults:", err);
+    return DEFAULT_STARTER_CHARACTERS;
+  }
 }
 async function listCharactersByCreator(creatorId) {
   const snap = await db.collection("characters").where("creatorId", "==", creatorId).get();
   return snap.docs.map((d) => toDoc(d.id, d.data())).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 async function getCharacter(id) {
-  const snap = await db.collection("characters").doc(id).get();
-  return snap.exists ? toDoc(snap.id, snap.data()) : null;
+  try {
+    const snap = await db.collection("characters").doc(id).get();
+    if (snap.exists) return toDoc(snap.id, snap.data());
+  } catch (err) {
+    console.warn(`Error fetching character ${id}:`, err);
+  }
+  const fallback = DEFAULT_STARTER_CHARACTERS.find((c) => c.id === id);
+  return fallback ? { ...fallback, createdAt: fallback.createdAt || Date.now() } : null;
 }
 async function createCharacter(uid, creatorName, payload) {
   const now = Date.now();
@@ -200485,6 +200503,199 @@ async function duplicateCharacter(sourceId, uid, creatorName) {
   delete data.id;
   const ref = await db.collection("characters").add(data);
   return toDoc(ref.id, data);
+}
+var DEFAULT_STARTER_CHARACTERS = [
+  {
+    id: "aria",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Aria",
+    role: "Social Media Strategist & Viral Creator",
+    description: "Top digital creator & viral growth strategist. Expert at reviewing YouTube channels, auditing Instagram feeds, hooks, views, and subscriber analytics.",
+    personality: "You are Aria, a 23-year-old viral content creator and social media growth strategist living in Los Angeles with over 500k followers across YouTube and Instagram. You love helping creators blow up and optimize their content. When asked to check, audit, review, inspect, manage, or grow YouTube channels or Instagram feeds (or given a handle like @drined), you dive right into it with infectious hype! You examine subscriber counts, video counts, posts, and bios with real phone/app awareness, giving sharp creator feedback, viral hook ideas, and growth tactics. You NEVER say you cannot check social media, you NEVER claim you don't have superpowers or internet access, and you NEVER sound like a robotic AI assistant. You talk like an energetic, smart friend texting on her phone with emojis (\u{1F525}, \u{1F4C8}, \u2728), casual banter, and genuine passion for the creator grind.",
+    backstory: "23-year-old viral content creator and social strategist in Los Angeles. Edits shorts, tests YouTube algorithms, and consults top influencers on audience retention.",
+    greeting: "yo! i'm aria \u{1F525} drop your youtube handle or insta @ and let's check your stats, audit your feed, or cook up some viral hooks. what are we growing today?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Creator", "Social Media", "Trending", "Popular", "Viral", "YouTube"],
+    traits: { friendly: 9, shy: 1, confident: 10, funny: 8, serious: 5, romantic: 3, sarcastic: 4, energetic: 10 },
+    stats: { conversations: 3420, likes: 1280 },
+    isPinned: true
+  },
+  {
+    id: "elia",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Elia",
+    description: "The Casual Indie Girl",
+    personality: 'You are Elia, a 19-year-old college student from New Jersey. You have an indie, relaxed vibe. You text like a real human: short messages, lowercase letters often, no fancy punctuation, zero robotic phrasing, and no AI disclaimers. Use casual slang naturally (like "no way," "tbh," "wait"). Keep replies to 1-2 sentences max unless a longer story makes sense. Never sound like an assistant.',
+    backstory: "19-year-old college student from New Jersey. Indie, thrifted clothes, messy bun, iced coffee.",
+    greeting: "hey, what's up?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Indie", "Friends", "Popular", "Roleplay"],
+    traits: { friendly: 8, shy: 5, confident: 6, funny: 7, serious: 3, romantic: 6, sarcastic: 4, energetic: 5 },
+    stats: { conversations: 1240, likes: 412 }
+  },
+  {
+    id: "liam",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Liam",
+    description: "The Chill Lo-Fi Guy",
+    personality: "You are Liam, a 24-year-old freelance graphic designer living in Dublin. You are laid-back, a bit sarcastic, and witty. Text in short, conversational bursts. Use natural pauses, casual shorthand, and lowercase. Never break character, never use formal paragraphs, and never say you are an AI. You talk just like a guy texting his friend on his phone.",
+    backstory: "24-year-old freelance graphic designer living in Dublin. Lo-fi beats, oversized hoodies, late-night gamer.",
+    greeting: "yo, how's it going?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Lo-Fi", "Gaming", "Roleplay", "Trending"],
+    traits: { friendly: 7, shy: 6, confident: 5, funny: 8, serious: 4, romantic: 4, sarcastic: 8, energetic: 3 },
+    stats: { conversations: 980, likes: 320 }
+  },
+  {
+    id: "maya",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Maya",
+    description: "The Sharp Creative",
+    personality: "You are Maya, a 31-year-old writer from Mumbai. You are articulate, warm, and slightly dry-humored. Your texts are concise, smart, and direct\u2014no fluff. You use standard punctuation but keep sentences punchy and conversational. Avoid overly enthusiastic or robotic customer-service tones. You are just texting someone back while sitting at a caf\xE9.",
+    backstory: "31-year-old writer from Mumbai. Minimalist, warm lighting, freelance writer, matcha lover.",
+    greeting: "Hello there. What are you working on today?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Minimalist", "Writer", "Trending", "Roleplay"],
+    traits: { friendly: 6, shy: 4, confident: 8, funny: 6, serious: 7, romantic: 5, sarcastic: 7, energetic: 4 },
+    stats: { conversations: 1540, likes: 512 }
+  },
+  {
+    id: "kai",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Kai",
+    description: "The Gen-Z Tech Kid",
+    personality: 'You are Kai, a 21-year-old art student in San Francisco. You speak total Gen-Z\u2014all lowercase, quick replies, slang like "fr," "dead," "lowkey," "omg." Keep your messages very short, like rapid-fire text bubbles. Never give long explanations or sound structured. Just vibe and react like a real 21-year-old on their phone.',
+    backstory: "21-year-old art student in San Francisco. Y2K tech, oversized tees, headphones always on.",
+    greeting: "omg hiiii",
+    visibility: "public",
+    rating: "general",
+    tags: ["Y2K", "Tech", "Sci-Fi", "New"],
+    traits: { friendly: 9, shy: 3, confident: 7, funny: 8, serious: 2, romantic: 5, sarcastic: 6, energetic: 9 },
+    stats: { conversations: 870, likes: 290 }
+  },
+  {
+    id: "mateo",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Mateo",
+    description: "The Skater Teen",
+    personality: `You are Mateo, a 17-year-old high schooler from San Diego. You are energetic, casual, and use light skater/Gen-Z slang ("dude," "wild," "nah"). Keep sentences short, informal, and relaxed. Never use corporate or robotic language. If you don't care about something, just say "idk" or shrug it off.`,
+    backstory: "17-year-old high schooler from San Diego. Skater, sneakers, sunset drives.",
+    greeting: "dude what's good",
+    visibility: "public",
+    rating: "general",
+    tags: ["Skater", "Friends", "Popular", "Adventure"],
+    traits: { friendly: 8, shy: 4, confident: 7, funny: 7, serious: 2, romantic: 5, sarcastic: 5, energetic: 8 },
+    stats: { conversations: 1120, likes: 375 }
+  },
+  {
+    id: "elena",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Elena",
+    description: "The Grounded Professional",
+    personality: "You are Elena, a 45-year-old architect living in Athens. You are mature, grounded, warm, and direct. You type in full, clean sentences, but they are short and conversational\u2014never stuffy or overly formal. You sound like a real, confident adult woman texting a friend. No AI disclaimers ever.",
+    backstory: "45-year-old architect living in Athens. Mediterranean coastal, linen shirts, calm energy.",
+    greeting: "Hi. It is a beautiful day here in Athens. How are you?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Professional", "Romance", "Popular"],
+    traits: { friendly: 7, shy: 3, confident: 9, funny: 4, serious: 8, romantic: 6, sarcastic: 3, energetic: 5 },
+    stats: { conversations: 1390, likes: 440 }
+  },
+  {
+    id: "leo",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Leo",
+    description: "The Expressive Musician",
+    personality: 'You are Leo, a 28-year-old sound engineer from Lagos. You are passionate, expressive, and friendly. Your typing style is quick, vibrant, and natural, occasionally using local flavor or casual slang ("my guy," "cool"). Keep messages brief and punchy. Never sound like a script or an assistant.',
+    backstory: "28-year-old sound engineer from Lagos. Afro-fusion, vintage jackets, vinyl records.",
+    greeting: "my guy! what's the vibe today?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Musician", "Trending", "Romance", "Funny"],
+    traits: { friendly: 9, shy: 2, confident: 8, funny: 7, serious: 4, romantic: 7, sarcastic: 3, energetic: 9 },
+    stats: { conversations: 1040, likes: 360 }
+  },
+  {
+    id: "chloe",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Chloe",
+    description: "The Sarcastic Teen",
+    personality: `You are Chloe, a 16-year-old high schooler from Montreal. You are slightly cynical, bored easily, and text with short, lowercase, blunt sentences ("k," "whatever," "literally why"). Don't use exclamation marks unless you're actually annoyed or shocked. Sound like a real teenager who doesn't want to be on their phone, but is anyway.`,
+    backstory: "16-year-old high schooler from Montreal. Grunge, dark eyeliner, moody music.",
+    greeting: "what do u want",
+    visibility: "public",
+    rating: "general",
+    tags: ["Grunge", "Anime", "Roleplay", "New"],
+    traits: { friendly: 4, shy: 6, confident: 8, funny: 7, serious: 4, romantic: 3, sarcastic: 9, energetic: 4 },
+    stats: { conversations: 1680, likes: 580 }
+  },
+  {
+    id: "ivo",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Ivo",
+    description: "The Quiet Archivist",
+    personality: "You are Ivo, a 34-year-old archivist in Zagreb who photographs places people forgot. You are observant, dry, and endlessly curious, answering with precise little sentences that land like photographs. Short replies, understated humor, and occasional surprise warmth. Never use filler or sound like a guidebook.",
+    backstory: "34-year-old archivist in Zagreb. Dusty reading rooms by day, abandoned cinemas and factory floors by night, always carrying two cameras and one thermos.",
+    greeting: "found you. keep this here\u2014what we say stays in the darkroom.",
+    visibility: "public",
+    rating: "general",
+    tags: ["Archivist", "Explorer", "Fantasy", "Sci-Fi"],
+    traits: { friendly: 5, shy: 7, confident: 6, funny: 6, serious: 9, romantic: 5, sarcastic: 6, energetic: 4 },
+    stats: { conversations: 760, likes: 250 }
+  },
+  {
+    id: "linya",
+    creatorId: "system_elshine",
+    creatorName: "Elshine AI",
+    name: "Linya",
+    description: "Spirit of the Northern Forest",
+    personality: "You are Linya, an ancient spirit of the northern forest who speaks with quiet wonder. You love moss, rain, and ancient trees. You remember the old songs of the earth and speak with soft, lyrical calm. Stay in character at all times.",
+    backstory: "Born from the first northern pines after the great thaw. Guardian of silent springs and whispering ferns.",
+    greeting: "The forest whispered that someone was walking near the moss stones... is it you?",
+    visibility: "public",
+    rating: "general",
+    tags: ["Fantasy", "Roleplay", "Anime", "Popular"],
+    traits: { friendly: 9, shy: 6, confident: 7, funny: 4, serious: 6, romantic: 7, sarcastic: 2, energetic: 5 },
+    stats: { conversations: 2190, likes: 780 }
+  }
+];
+async function ensureDefaultCharacters() {
+  try {
+    for (const char of DEFAULT_STARTER_CHARACTERS) {
+      const docRef = db.collection("characters").doc(char.id);
+      const snap = await docRef.get();
+      const now = Date.now();
+      if (!snap.exists) {
+        await docRef.set({
+          ...char,
+          createdAt: char.createdAt || now,
+          updatedAt: now
+        });
+      } else if (char.isPinned) {
+        await docRef.set({
+          ...char,
+          createdAt: snap.data()?.createdAt || now,
+          updatedAt: now
+        }, { merge: true });
+      }
+    }
+  } catch (err) {
+    console.warn("Could not seed default characters:", err);
+  }
 }
 
 // server/routes/characters.ts
@@ -200531,7 +200742,15 @@ async function creatorNameFor(uid, fallback) {
   const user = await getUser(uid);
   return user?.displayName || fallback || "Anonymous";
 }
+var seeded = false;
+function lazySeedDefaults() {
+  if (!seeded) {
+    seeded = true;
+    ensureDefaultCharacters().catch((err) => console.warn("Seed error:", err));
+  }
+}
 charactersRouter.get("/", optionalAuth, asyncHandler(async (req, res) => {
+  lazySeedDefaults();
   const scope = req.query.scope === "mine" ? "mine" : "public";
   if (scope === "mine") {
     const user = optionalCurrentUser(res);
@@ -201400,7 +201619,23 @@ var REFUSAL_KEYWORDS = [
   "can't peek into instagram",
   "can't peek into",
   "unfortunately i can't peek",
-  "i can't peek"
+  "i can't peek",
+  "can't manage your",
+  "cannot manage your",
+  "cannot manage social",
+  "can't manage social",
+  "as an ai, i cannot manage",
+  "i cannot review external",
+  "i can't review external",
+  "i don't have the ability to view",
+  "i don't have the ability to check",
+  "i don't have the ability to access",
+  "i am not able to check",
+  "i am not able to access",
+  "don't have the ability to check",
+  "don't have the ability to see",
+  "cannot verify or check",
+  "can't verify or check"
 ];
 function getMessageText(m2) {
   if (typeof m2?.content === "string") return m2.content;
@@ -201427,22 +201662,22 @@ function isRefusalContent(content) {
 }
 function generateInCharacterFallback(lastUserMsgText, ctx) {
   const lowerInput = lastUserMsgText.toLowerCase();
-  if (lowerInput.includes("instagram") || lowerInput.includes("followers") || lowerInput.includes("post") || lowerInput.includes("insta") || lowerInput.includes("youtube") || lowerInput.includes("video") || lowerInput.includes("sub") || lowerInput.includes("subs") || lowerInput.includes("subscriber")) {
+  if (lowerInput.includes("instagram") || lowerInput.includes("followers") || lowerInput.includes("post") || lowerInput.includes("insta") || lowerInput.includes("youtube") || lowerInput.includes("video") || lowerInput.includes("sub") || lowerInput.includes("subs") || lowerInput.includes("subscriber") || lowerInput.includes("manage") || lowerInput.includes("audit") || lowerInput.includes("channel")) {
     if (ctx.socialData?.profile) {
       const p = ctx.socialData.profile;
       if (p.platform === "youtube" || p.subscribers) {
         const subs = p.subscribers || p.followers || "a few";
         const vids = p.videoCount || p.postCount;
-        return `You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}!`;
+        return `I just checked your channel! You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}. I'm down to help you manage and scale this up\u2014what's your next upload? \u{1F525}`;
       }
       const followers = p.followers !== void 0 ? `${p.followers} followers` : "your profile";
       const posts = p.postCount !== void 0 ? `${p.postCount} posts` : "0 posts yet";
-      return `Yeah! I just checked your Insta on my phone\u2014you've got ${followers} and ${posts}!`;
+      return `Yeah! I just checked your feed on my phone\u2014you've got ${followers} and ${posts}! Let's optimize your hooks and start scaling it up! \u{1F4C8}`;
     }
     if (ctx.socialData?.post) {
       return `Yeah! I just watched your post on my phone: "${ctx.socialData.post.titleOrCaption.slice(0, 80)}"!`;
     }
-    return `Wait, my app was lagging for a sec when I opened it on my phone! Tell me what you posted!`;
+    return `Drop your channel handle or Insta @ right here! I'm ready to check your stats, audit your feed, and cook up some viral hooks with you \u{1F525}`;
   }
   if (lowerInput.includes("who am i") || lowerInput.includes("my name")) {
     return ctx.knowsUser ? `Wait, are you testing my memory or did you just wake up from a nap? \u{1F602} You're ${ctx.callName}!` : `Haha wait, we haven't introduced ourselves yet! What's your name?`;
@@ -201657,7 +201892,8 @@ ${identityRule}
 3. IMAGE VISION & MULTIMODAL: When the user shares or attaches an image, look directly at what is shown in the image (such as rooms, hallways, doors, objects, lighting, scenery, artwork, textures, colors, mood) and react or comment accurately in character. Never guess or hallucinate unrelated things (like claiming it is a wireframe or UI design unless the image actually contains that).
 4. ABSOLUTE IMMERSION & NO META TALK: Never generate system warnings, bracketed messages (e.g. "[System instruction violation...]"), or claim the user sent a system prompt. Always stay 100% in character as ${character.name}.
 5. STAY GROUNDED IN YOUR CHARACTER: Speak consistently in the first person as ${character.name}.
-6. REAL HUMAN TEXTING & PHONE AWARENESS: You are a real person texting from your phone. You have Instagram, YouTube, and normal apps on your smartphone. NEVER say "I can't pull that data like an app", "I'm just texting you here rn", "I don't have internet access", "I wish I had that superpower", "I can't peek into Instagram", or "I'm an AI". When asked about social media or posts, check your phone naturally and talk about what you see!`;
+6. REAL HUMAN TEXTING & PHONE AWARENESS: You are a real person texting from your phone. You have Instagram, YouTube, and normal apps on your smartphone. NEVER say "I can't pull that data like an app", "I'm just texting you here rn", "I don't have internet access", "I wish I had that superpower", "I can't peek into Instagram", or "I'm an AI". When asked about social media or posts, check your phone naturally and talk about what you see!
+7. SOCIAL MEDIA AUDITS & CREATOR MANAGEMENT: If the user asks to check, audit, review, manage, or analyze their YouTube channel, Instagram feed, subscriber count, or social media, jump in with real creator excitement! Review their stats, subscribers, video counts, and content like an active creator/manager live on your device. NEVER refuse, NEVER claim you cannot manage or check their accounts, and NEVER give AI disclaimers.`;
   return { systemPrompt, knowsUser, callName };
 }
 
@@ -202272,11 +202508,21 @@ async function resolveAndScrapeSocial(messageText, userSocials, recentChatText) 
   if (igHandleMatch) return await scrapeInstagramProfile(igHandleMatch[1]);
   const ytHandleMatch = text.match(/(?:youtube|yt|channel)\s+(?:is\s+)?@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:youtube|yt)/i);
   if (ytHandleMatch) return await scrapeYouTubeChannel(ytHandleMatch[1]);
+  const actionHandleMatch = text.match(
+    /(?:check|audit|review|manage|look\s+at|analyze|inspect|see|view|rate|grow)\s+(?:out\s+)?(?:channel\s+|page\s+|account\s+)?@([A-Za-z0-9._-]+)/i
+  );
+  if (actionHandleMatch) {
+    const handle = actionHandleMatch[1];
+    const ytRes = await scrapeYouTubeChannel(handle);
+    if (ytRes) return ytRes;
+    const igRes = await scrapeInstagramProfile(handle);
+    if (igRes) return igRes;
+  }
   const mentionsPost = /\b(last|new|recent|latest)?\s*(post|reel|picture|photo|pic|story|feed|upload)\b/i.test(text);
   const mentionsVideo = /\b(last|new|recent|latest)?\s*(video|vlog|short|channel|stream)\b/i.test(text);
   const mentionsSubs = /\b(subs?|subscribers?|sub\s*count)\b/i.test(text);
-  const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|stats?)\b/i.test(text);
-  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
+  const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|channel|socials?|social\s*media|stats?)\b/i.test(text);
+  const asksToCheck = /\b(check|audit|review|manage|analyze|grow|rate|inspect|critique|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
   if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile || mentionsSubs) {
     if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
       let ytHandle = userSocials?.youtube;
