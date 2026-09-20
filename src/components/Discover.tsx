@@ -41,15 +41,15 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
   }, []);
 
   const filters = [
-    'All', 'Popular', 'Trending', 'New', 'Romance', 
-    'Fantasy', 'Anime', 'Roleplay', 'Sci-Fi', 'Gaming', 
-    'Adventure', 'Funny', 'Friends'
+    'All', 'Creator', 'YouTube', 'Instagram', 'Popular', 'Trending', 'New', 
+    'Gaming', 'Romance', 'Fantasy', 'Anime', 'Roleplay', 'Friends'
   ];
 
   const filteredCharacters = characters.filter(char => {
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = !q || 
       (char.name || '').toLowerCase().includes(q) || 
+      (char.role || '').toLowerCase().includes(q) || 
       (char.description || '').toLowerCase().includes(q) ||
       (char.tags || []).some(t => t.toLowerCase().includes(q));
     
@@ -132,51 +132,6 @@ const Discover: React.FC<DiscoverProps> = ({ onNavigateToChat }) => {
 
       {/* 2. Character Grid */}
       <main className="px-6 md:px-10 py-8 max-w-7xl mx-auto">
-        {/* Pinned Spotlight Banner */}
-        {(() => {
-          const pinned = characters.find(c => c.isPinned || c.id === 'aria');
-          if (!pinned || searchQuery) return null;
-          return (
-            <div className="mb-8 p-5 md:p-6 rounded-3xl bg-gradient-to-r from-zinc-950 via-zinc-900 to-black text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 border border-zinc-800">
-              <div className="flex items-center gap-4.5 z-10">
-                <div 
-                  onClick={() => handleChat(pinned.id)}
-                  className="relative w-20 h-20 md:w-24 md:h-24 rounded-2xl overflow-hidden shrink-0 cursor-pointer ring-2 ring-amber-400/50 group/spot"
-                >
-                  <img 
-                    src={characterAvatar(pinned)} 
-                    alt={pinned.name} 
-                    className="w-full h-full object-cover group-hover/spot:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-sm">
-                      <Pin className="w-2.5 h-2.5 fill-white rotate-45" /> Pinned Featured Creator
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-medium">Verified Social Media Strategist</span>
-                  </div>
-                  <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                    {pinned.name}
-                    <span className="text-xs font-normal text-zinc-400">({pinned.role || 'Viral Creator'})</span>
-                  </h2>
-                  <p className="text-xs text-zinc-300 max-w-xl line-clamp-2">
-                    {pinned.description}
-                  </p>
-                </div>
-              </div>
-              <div className="z-10 w-full md:w-auto shrink-0 flex items-center gap-3 justify-end">
-                <button
-                  onClick={() => handleChat(pinned.id)}
-                  className="w-full md:w-auto px-6 py-3 rounded-full bg-white text-black hover:bg-zinc-100 font-bold text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  Chat with {pinned.name} <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          );
-        })()}
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-28 space-y-3">

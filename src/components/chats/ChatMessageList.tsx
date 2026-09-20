@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { RotateCcw, Trash2, Zap } from "lucide-react";
+import { RotateCcw, Trash2, Workflow } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import type { Character, Message } from "../../types";
@@ -24,8 +24,20 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
   onRegenerate,
   onDeleteMessage,
 }) => {
-  const [inspectedMessageId, setInspectedMessageId] = useState<string | null>(null);
+  const [openPipelineIds, setOpenPipelineIds] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const isMapOpen = (id: string, hasExecution: boolean) => {
+    if (openPipelineIds[id] !== undefined) return openPipelineIds[id];
+    return hasExecution;
+  };
+
+  const togglePipelineMap = (id: string, hasExecution: boolean) => {
+    setOpenPipelineIds((prev) => {
+      const current = prev[id] !== undefined ? prev[id] : hasExecution;
+      return { ...prev, [id]: !current };
+    });
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -78,7 +90,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   </ReactMarkdown>
                 </div>
 
-                {!isUser && (m.toolExecution || inspectedMessageId === m.id) && (
+                {!isUser && (m.toolExecution || isMapOpen(m.id, false)) && (
                   <ToolExecutionMap
                     toolExecution={
                       m.toolExecution || {
@@ -100,46 +112,49 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                         summary: "Persona Reasoning & Pipeline",
                       }
                     }
-                    initialOpen={inspectedMessageId === m.id || !!m.toolExecution}
+                    isOpen={isMapOpen(m.id, !!m.toolExecution)}
+                    onToggle={() => togglePipelineMap(m.id, !!m.toolExecution)}
                   />
                 )}
 
                 <div className={cn(
-                  "absolute -top-2.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-20",
-                  isUser ? "-left-14" : "-right-24"
+                  "absolute -top-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 z-30",
+                  isUser ? "left-2" : "right-2"
                 )}>
                   {!isUser && (
                     <button
                       type="button"
-                      onClick={() => setInspectedMessageId((prev) => (prev === m.id ? null : m.id))}
+                      onClick={() => togglePipelineMap(m.id, !!m.toolExecution)}
                       className={cn(
-                        "p-1 rounded-full shadow-sm border transition-all active:scale-95 cursor-pointer",
-                        inspectedMessageId === m.id || m.toolExecution
-                          ? "text-amber-500 hover:text-amber-600 bg-amber-50 border-amber-300 ring-1 ring-amber-400/30"
-                          : "text-zinc-400 hover:text-black hover:bg-zinc-100 border-zinc-200 bg-white"
+                        "p-1.5 rounded-full shadow-sm border transition-all active:scale-95 cursor-pointer flex items-center justify-center",
+                        isMapOpen(m.id, !!m.toolExecution)
+                          ? "text-amber-600 hover:text-amber-700 bg-amber-50 border-amber-300 ring-2 ring-amber-400/40"
+                          : "text-zinc-500 hover:text-black hover:bg-zinc-100 border-zinc-200 bg-white"
                       )}
-                      title="Inspect tool callings & pipeline map"
+                      title="Inspect AI Tools & Pipeline Map"
                     >
-                      <Zap className="w-3 h-3 fill-current" />
+                      <Workflow className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {!isUser && m.id !== "temp" && (
                     <button
+                      type="button"
                       onClick={() => onRegenerate(m.id)}
                       disabled={isLoading}
-                      className="p-1 rounded-full text-zinc-400 hover:text-black hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95 cursor-pointer"
+                      className="p-1.5 rounded-full text-zinc-500 hover:text-black hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center"
                       title="Regenerate reply"
                     >
-                      <RotateCcw className="w-3 h-3" />
+                      <RotateCcw className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {m.id !== "initial" && m.id !== "temp" && (
                     <button
+                      type="button"
                       onClick={() => onDeleteMessage(m.id)}
-                      className="p-1 rounded-full text-zinc-400 hover:text-red-500 hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95 cursor-pointer"
+                      className="p-1.5 rounded-full text-zinc-500 hover:text-red-500 hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center"
                       title="Delete message"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>

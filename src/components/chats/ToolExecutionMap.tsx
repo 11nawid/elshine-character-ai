@@ -19,17 +19,27 @@ import type { MessageToolExecution } from "../../types";
 interface ToolExecutionMapProps {
   toolExecution: MessageToolExecution;
   initialOpen?: boolean;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
-export const ToolExecutionMap: React.FC<ToolExecutionMapProps> = ({ toolExecution, initialOpen }) => {
-  const [isOpen, setIsOpen] = useState(initialOpen ?? false);
+export const ToolExecutionMap: React.FC<ToolExecutionMapProps> = ({
+  toolExecution,
+  initialOpen,
+  isOpen: controlledIsOpen,
+  onToggle,
+}) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(initialOpen ?? false);
   const [isFullView, setIsFullView] = useState(false);
 
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const handleToggle = onToggle || (() => setInternalIsOpen((prev) => !prev));
+
   useEffect(() => {
-    if (initialOpen !== undefined) {
-      setIsOpen(initialOpen);
+    if (initialOpen !== undefined && controlledIsOpen === undefined) {
+      setInternalIsOpen(initialOpen);
     }
-  }, [initialOpen]);
+  }, [initialOpen, controlledIsOpen]);
 
   const steps = toolExecution?.steps || [];
   if (steps.length === 0) return null;
@@ -39,7 +49,7 @@ export const ToolExecutionMap: React.FC<ToolExecutionMapProps> = ({ toolExecutio
       {/* Compact Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={handleToggle}
         className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-semibold bg-zinc-900 text-white hover:bg-black border border-zinc-700/60 shadow-md transition-all active:scale-95 cursor-pointer mt-2.5"
       >
         <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse" />
