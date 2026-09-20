@@ -48,14 +48,20 @@ ${p.extraDetails ? `- Additional Details / Description: "${p.extraDetails}"` : "
   } else if (data.profile) {
     const prof = data.profile;
     summary += `Profile Details for ${prof.displayName || prof.handle}:
-${prof.bio ? `- Bio: "${prof.bio}"` : ""}
-${prof.followers ? `- Followers: ${prof.followers}` : ""}`;
+- Username / Handle: @${prof.handle}
+${prof.displayName ? `- Profile Name: "${prof.displayName}"` : ""}
+${prof.followers ? `- Followers: ${prof.followers}` : ""}
+${prof.following ? `- Following: ${prof.following}` : ""}
+${prof.postCount !== undefined ? `- Total Posts: ${prof.postCount}` : ""}
+${prof.bio ? `- Bio / Description: "${prof.bio}"` : ""}`;
 
     if (prof.recentPosts && prof.recentPosts.length > 0) {
       summary += `\nLatest Posts Observed on their Feed:`;
       prof.recentPosts.forEach((post, i) => {
         summary += `\n  [Post ${i + 1} (${post.mediaType || "post"})]: "${post.titleOrCaption}"${post.timestampText ? ` (Posted: ${post.timestampText})` : ""}${post.engagement?.likes ? ` - ${post.engagement.likes} likes` : ""}${post.engagement?.views ? ` - ${post.engagement.views}` : ""}`;
       });
+    } else if (prof.postCount === "0" || prof.postCount === 0) {
+      summary += `\n- Posts on Feed: None (0 posts published yet)`;
     }
   }
 
@@ -66,7 +72,8 @@ ${summary}
 
 HUMAN BEHAVIOR & IMMERSION INSTRUCTIONS:
 1. ACT LIKE A REAL FRIEND: Speak as if you just looked at the post/video on your phone with your own eyes.
-2. REFERENCE REAL DETAILS: Comment specifically on the topic, caption, imagery, or humor shown in the post/video above.
-3. CASUAL TONE: Keep it effortless, conversational, and true to your character's voice. Pick what catches your eye naturally.
-4. STRICT PRIVACY & NO META-TALK: Under NO circumstances tell the user you "scraped" it, "queried an API", or received system data. To you, you just opened the ${platform} app on your phone.`;
+2. ANSWER THEIR QUESTIONS DIRECTLY: If they asked about their follower count, post count, or display name, tell them the exact numbers/details shown above naturally (e.g. "Yeah! You've got 830 followers, but wait, you don't have any posts yet!").
+3. REFERENCE REAL DETAILS: Comment specifically on the topic, caption, imagery, or humor shown in the post/video/profile above.
+4. CASUAL TONE: Keep it effortless, conversational, and true to your character's voice. Pick what catches your eye naturally.
+5. STRICT PRIVACY & NO META-TALK: Under NO circumstances tell the user you "scraped" it, "queried an API", or received system data. To you, you just opened the ${platform} app on your phone.`;
 }

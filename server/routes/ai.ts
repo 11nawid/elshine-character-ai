@@ -148,11 +148,13 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
   // Autonomous real-time social media inspection (Instagram & YouTube)
   let socialPerceptionBlock: string | undefined;
   let socialDataForMemory: string | undefined;
+  let socialData: any = null;
 
   try {
-    const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials);
+    const recentChatText = storedMessages.slice(-6).map((m) => m.text).join("\n");
+    const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials, recentChatText);
     // Timeout race: never delay chat generation by more than 3500ms
-    const socialData = await Promise.race([
+    socialData = await Promise.race([
       socialPerceptionTask,
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
     ]);
@@ -220,6 +222,7 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
       knowsUser,
       callName,
       characterName: character.name || "Elshine",
+      socialData,
     });
   }
 

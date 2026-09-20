@@ -66,9 +66,11 @@ export async function scrapeInstagramProfile(rawUsername: string): Promise<Socia
           profile: {
             platform: "instagram",
             handle: username,
-            displayName: user.full_name || username,
-            bio: user.biography || "",
+            displayName: user.full_name ? decodeEntities(user.full_name) : username,
+            bio: user.biography ? decodeEntities(user.biography) : "",
             followers: user.edge_followed_by?.count,
+            following: user.edge_follow?.count,
+            postCount: user.edge_owner_to_timeline_media?.count,
             isPrivate,
             recentPosts,
           },
@@ -98,9 +100,11 @@ export async function scrapeInstagramProfile(rawUsername: string): Promise<Socia
           profile: {
             platform: "instagram",
             handle: username,
-            displayName: user.full_name || username,
-            bio: user.biography || "",
+            displayName: user.full_name ? decodeEntities(user.full_name) : username,
+            bio: user.biography ? decodeEntities(user.biography) : "",
             followers: user.edge_followed_by?.count,
+            following: user.edge_follow?.count,
+            postCount: user.edge_owner_to_timeline_media?.count,
             isPrivate: !!user.is_private,
             recentPosts: [],
           },
@@ -122,6 +126,18 @@ export async function scrapeInstagramProfile(rawUsername: string): Promise<Socia
       const descMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
       const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
       if (descMatch || titleMatch) {
+        const descRaw = descMatch ? decodeEntities(descMatch[1]) : "";
+        const titleRaw = titleMatch ? decodeEntities(titleMatch[1]) : username;
+
+        const followersMatch = descRaw.match(/([0-9,.]+[KMBkmb]?)\s+Followers/i);
+        const followingMatch = descRaw.match(/([0-9,.]+[KMBkmb]?)\s+Following/i);
+        const postsMatch = descRaw.match(/([0-9,.]+[KMBkmb]?)\s+Posts/i);
+
+        let cleanName = titleRaw.replace(/\s*\(@[A-Za-z0-9._-]+\).*$/i, "").trim();
+        if (!cleanName || cleanName.toLowerCase().includes("instagram")) {
+          cleanName = username;
+        }
+
         const result: SocialPerceptionData = {
           platform: "instagram",
           targetType: "profile",
@@ -129,8 +145,11 @@ export async function scrapeInstagramProfile(rawUsername: string): Promise<Socia
           profile: {
             platform: "instagram",
             handle: username,
-            displayName: titleMatch ? decodeEntities(titleMatch[1]) : username,
-            bio: descMatch ? decodeEntities(descMatch[1]) : "",
+            displayName: cleanName,
+            bio: descRaw,
+            followers: followersMatch ? followersMatch[1] : undefined,
+            following: followingMatch ? followingMatch[1] : undefined,
+            postCount: postsMatch ? postsMatch[1] : undefined,
             recentPosts: [],
           },
         };

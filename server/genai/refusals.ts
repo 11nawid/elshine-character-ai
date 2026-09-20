@@ -25,6 +25,32 @@ export const REFUSAL_KEYWORDS = [
   "i cannot assist with this request",
   "i'm sorry, but as an ai",
   "i am sorry, but as an ai",
+  "can't pull all that insta data",
+  "can't pull that insta data",
+  "can't pull that data like an app",
+  "can't pull data like an app",
+  "can't pull insta data",
+  "i'm just texting u here rn",
+  "i'm just texting you here rn",
+  "just texting you here rn",
+  "just texting u here rn",
+  "can't access instagram",
+  "cannot access instagram",
+  "don't have access to instagram",
+  "can't check your instagram",
+  "cannot check your instagram",
+  "can't check instagram",
+  "don't have internet access",
+  "cannot access external",
+  "can't access external",
+  "i cannot browse",
+  "i can't browse",
+  "not able to browse",
+  "as an artificial intelligence",
+  "i am just an ai",
+  "i'm just an ai",
+  "i am an ai",
+  "i'm an ai",
 ];
 
 export function getMessageText(m: any): string {
@@ -68,11 +94,34 @@ interface FallbackContext {
   knowsUser: boolean;
   callName: string;
   characterName: string;
+  socialData?: any;
 }
 
 /** Generates a contextual in-character response when the AI refuses or times out. */
 export function generateInCharacterFallback(lastUserMsgText: string, ctx: FallbackContext): string {
   const lowerInput = lastUserMsgText.toLowerCase();
+
+  // Handle social media questions with real phone awareness
+  if (
+    lowerInput.includes("instagram") ||
+    lowerInput.includes("followers") ||
+    lowerInput.includes("post") ||
+    lowerInput.includes("insta") ||
+    lowerInput.includes("youtube") ||
+    lowerInput.includes("video")
+  ) {
+    if (ctx.socialData?.profile) {
+      const p = ctx.socialData.profile;
+      const followers = p.followers !== undefined ? `${p.followers} followers` : "your profile";
+      const posts = p.postCount !== undefined ? `${p.postCount} posts` : "0 posts yet";
+      return `Yeah! I just checked your Insta on my phone—you've got ${followers} and ${posts}!`;
+    }
+    if (ctx.socialData?.post) {
+      return `Yeah! I just watched your post on my phone: "${ctx.socialData.post.titleOrCaption.slice(0, 80)}"!`;
+    }
+    return `Wait, my app was lagging for a sec when I opened it on my phone! Tell me what you posted!`;
+  }
+
   if (lowerInput.includes("who am i") || lowerInput.includes("my name")) {
     return ctx.knowsUser
       ? `Wait, are you testing my memory or did you just wake up from a nap? 😂 You're ${ctx.callName}!`

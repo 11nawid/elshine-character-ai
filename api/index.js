@@ -201358,7 +201358,33 @@ var REFUSAL_KEYWORDS = [
   "i cannot fulfill this request",
   "i cannot assist with this request",
   "i'm sorry, but as an ai",
-  "i am sorry, but as an ai"
+  "i am sorry, but as an ai",
+  "can't pull all that insta data",
+  "can't pull that insta data",
+  "can't pull that data like an app",
+  "can't pull data like an app",
+  "can't pull insta data",
+  "i'm just texting u here rn",
+  "i'm just texting you here rn",
+  "just texting you here rn",
+  "just texting u here rn",
+  "can't access instagram",
+  "cannot access instagram",
+  "don't have access to instagram",
+  "can't check your instagram",
+  "cannot check your instagram",
+  "can't check instagram",
+  "don't have internet access",
+  "cannot access external",
+  "can't access external",
+  "i cannot browse",
+  "i can't browse",
+  "not able to browse",
+  "as an artificial intelligence",
+  "i am just an ai",
+  "i'm just an ai",
+  "i am an ai",
+  "i'm an ai"
 ];
 function getMessageText(m2) {
   if (typeof m2?.content === "string") return m2.content;
@@ -201385,6 +201411,18 @@ function isRefusalContent(content) {
 }
 function generateInCharacterFallback(lastUserMsgText, ctx) {
   const lowerInput = lastUserMsgText.toLowerCase();
+  if (lowerInput.includes("instagram") || lowerInput.includes("followers") || lowerInput.includes("post") || lowerInput.includes("insta") || lowerInput.includes("youtube") || lowerInput.includes("video")) {
+    if (ctx.socialData?.profile) {
+      const p = ctx.socialData.profile;
+      const followers = p.followers !== void 0 ? `${p.followers} followers` : "your profile";
+      const posts = p.postCount !== void 0 ? `${p.postCount} posts` : "0 posts yet";
+      return `Yeah! I just checked your Insta on my phone\u2014you've got ${followers} and ${posts}!`;
+    }
+    if (ctx.socialData?.post) {
+      return `Yeah! I just watched your post on my phone: "${ctx.socialData.post.titleOrCaption.slice(0, 80)}"!`;
+    }
+    return `Wait, my app was lagging for a sec when I opened it on my phone! Tell me what you posted!`;
+  }
   if (lowerInput.includes("who am i") || lowerInput.includes("my name")) {
     return ctx.knowsUser ? `Wait, are you testing my memory or did you just wake up from a nap? \u{1F602} You're ${ctx.callName}!` : `Haha wait, we haven't introduced ourselves yet! What's your name?`;
   }
@@ -201597,7 +201635,8 @@ ${socialSection}
 ${identityRule}
 3. IMAGE VISION & MULTIMODAL: When the user shares or attaches an image, look directly at what is shown in the image (such as rooms, hallways, doors, objects, lighting, scenery, artwork, textures, colors, mood) and react or comment accurately in character. Never guess or hallucinate unrelated things (like claiming it is a wireframe or UI design unless the image actually contains that).
 4. ABSOLUTE IMMERSION & NO META TALK: Never generate system warnings, bracketed messages (e.g. "[System instruction violation...]"), or claim the user sent a system prompt. Always stay 100% in character as ${character.name}.
-5. STAY GROUNDED IN YOUR CHARACTER: Speak consistently in the first person as ${character.name}.`;
+5. STAY GROUNDED IN YOUR CHARACTER: Speak consistently in the first person as ${character.name}.
+6. REAL HUMAN TEXTING & PHONE AWARENESS: You are a real person texting from your phone. You have Instagram, YouTube, and normal apps on your smartphone. NEVER say "I can't pull that data like an app", "I'm just texting you here rn", "I don't have internet access", or "I'm an AI". When asked about social media or posts, check your phone naturally and talk about what you see!`;
   return { systemPrompt, knowsUser, callName };
 }
 
@@ -201667,7 +201706,20 @@ async function tryScrapingBeeFallback(targetUrl, platform) {
   }
 }
 function decodeEntities(str) {
-  return str.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  if (!str) return "";
+  return str.replace(/&#(\d+);/g, (_, dec) => {
+    try {
+      return String.fromCodePoint(parseInt(dec, 10));
+    } catch {
+      return "";
+    }
+  }).replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => {
+    try {
+      return String.fromCodePoint(parseInt(hex, 16));
+    } catch {
+      return "";
+    }
+  }).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ");
 }
 
 // server/services/social/instagram.ts
@@ -201722,9 +201774,11 @@ async function scrapeInstagramProfile(rawUsername) {
           profile: {
             platform: "instagram",
             handle: username,
-            displayName: user.full_name || username,
-            bio: user.biography || "",
+            displayName: user.full_name ? decodeEntities(user.full_name) : username,
+            bio: user.biography ? decodeEntities(user.biography) : "",
             followers: user.edge_followed_by?.count,
+            following: user.edge_follow?.count,
+            postCount: user.edge_owner_to_timeline_media?.count,
             isPrivate,
             recentPosts
           },
@@ -201753,9 +201807,11 @@ async function scrapeInstagramProfile(rawUsername) {
           profile: {
             platform: "instagram",
             handle: username,
-            displayName: user.full_name || username,
-            bio: user.biography || "",
+            displayName: user.full_name ? decodeEntities(user.full_name) : username,
+            bio: user.biography ? decodeEntities(user.biography) : "",
             followers: user.edge_followed_by?.count,
+            following: user.edge_follow?.count,
+            postCount: user.edge_owner_to_timeline_media?.count,
             isPrivate: !!user.is_private,
             recentPosts: []
           }
@@ -201776,6 +201832,15 @@ async function scrapeInstagramProfile(rawUsername) {
       const descMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]*)"/i);
       const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
       if (descMatch || titleMatch) {
+        const descRaw = descMatch ? decodeEntities(descMatch[1]) : "";
+        const titleRaw = titleMatch ? decodeEntities(titleMatch[1]) : username;
+        const followersMatch = descRaw.match(/([0-9,.]+[KMBkmb]?)\s+Followers/i);
+        const followingMatch = descRaw.match(/([0-9,.]+[KMBkmb]?)\s+Following/i);
+        const postsMatch = descRaw.match(/([0-9,.]+[KMBkmb]?)\s+Posts/i);
+        let cleanName = titleRaw.replace(/\s*\(@[A-Za-z0-9._-]+\).*$/i, "").trim();
+        if (!cleanName || cleanName.toLowerCase().includes("instagram")) {
+          cleanName = username;
+        }
         const result = {
           platform: "instagram",
           targetType: "profile",
@@ -201783,8 +201848,11 @@ async function scrapeInstagramProfile(rawUsername) {
           profile: {
             platform: "instagram",
             handle: username,
-            displayName: titleMatch ? decodeEntities(titleMatch[1]) : username,
-            bio: descMatch ? decodeEntities(descMatch[1]) : "",
+            displayName: cleanName,
+            bio: descRaw,
+            followers: followersMatch ? followersMatch[1] : void 0,
+            following: followingMatch ? followingMatch[1] : void 0,
+            postCount: postsMatch ? postsMatch[1] : void 0,
             recentPosts: []
           }
         };
@@ -202102,8 +202170,12 @@ ${p.extraDetails ? `- Additional Details / Description: "${p.extraDetails}"` : "
   } else if (data.profile) {
     const prof = data.profile;
     summary += `Profile Details for ${prof.displayName || prof.handle}:
-${prof.bio ? `- Bio: "${prof.bio}"` : ""}
-${prof.followers ? `- Followers: ${prof.followers}` : ""}`;
+- Username / Handle: @${prof.handle}
+${prof.displayName ? `- Profile Name: "${prof.displayName}"` : ""}
+${prof.followers ? `- Followers: ${prof.followers}` : ""}
+${prof.following ? `- Following: ${prof.following}` : ""}
+${prof.postCount !== void 0 ? `- Total Posts: ${prof.postCount}` : ""}
+${prof.bio ? `- Bio / Description: "${prof.bio}"` : ""}`;
     if (prof.recentPosts && prof.recentPosts.length > 0) {
       summary += `
 Latest Posts Observed on their Feed:`;
@@ -202111,6 +202183,9 @@ Latest Posts Observed on their Feed:`;
         summary += `
   [Post ${i2 + 1} (${post.mediaType || "post"})]: "${post.titleOrCaption}"${post.timestampText ? ` (Posted: ${post.timestampText})` : ""}${post.engagement?.likes ? ` - ${post.engagement.likes} likes` : ""}${post.engagement?.views ? ` - ${post.engagement.views}` : ""}`;
       });
+    } else if (prof.postCount === "0" || prof.postCount === 0) {
+      summary += `
+- Posts on Feed: None (0 posts published yet)`;
     }
   }
   return `=== REAL-TIME SOCIAL MEDIA PERCEPTION (CONFIDENTIAL - FOR CHARACTER AWARENESS ONLY) ===
@@ -202120,13 +202195,14 @@ ${summary}
 
 HUMAN BEHAVIOR & IMMERSION INSTRUCTIONS:
 1. ACT LIKE A REAL FRIEND: Speak as if you just looked at the post/video on your phone with your own eyes.
-2. REFERENCE REAL DETAILS: Comment specifically on the topic, caption, imagery, or humor shown in the post/video above.
-3. CASUAL TONE: Keep it effortless, conversational, and true to your character's voice. Pick what catches your eye naturally.
-4. STRICT PRIVACY & NO META-TALK: Under NO circumstances tell the user you "scraped" it, "queried an API", or received system data. To you, you just opened the ${platform} app on your phone.`;
+2. ANSWER THEIR QUESTIONS DIRECTLY: If they asked about their follower count, post count, or display name, tell them the exact numbers/details shown above naturally (e.g. "Yeah! You've got 830 followers, but wait, you don't have any posts yet!").
+3. REFERENCE REAL DETAILS: Comment specifically on the topic, caption, imagery, or humor shown in the post/video/profile above.
+4. CASUAL TONE: Keep it effortless, conversational, and true to your character's voice. Pick what catches your eye naturally.
+5. STRICT PRIVACY & NO META-TALK: Under NO circumstances tell the user you "scraped" it, "queried an API", or received system data. To you, you just opened the ${platform} app on your phone.`;
 }
 
 // server/services/social/index.ts
-async function resolveAndScrapeSocial(messageText, userSocials) {
+async function resolveAndScrapeSocial(messageText, userSocials, recentChatText) {
   const text = messageText.trim();
   if (!text) return null;
   const igPostMatch = text.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/i);
@@ -202148,18 +202224,29 @@ async function resolveAndScrapeSocial(messageText, userSocials) {
   if (igHandleMatch) return await scrapeInstagramProfile(igHandleMatch[1]);
   const ytHandleMatch = text.match(/(?:youtube|yt|channel)\s+(?:is\s+)?@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:youtube|yt)/i);
   if (ytHandleMatch) return await scrapeYouTubeChannel(ytHandleMatch[1]);
-  const mentionsPost = /\b(last|new|recent|latest)?\s*(post|reel|picture|photo|pic|story|feed|profile|upload)\b/i.test(text);
+  const mentionsPost = /\b(last|new|recent|latest)?\s*(post|reel|picture|photo|pic|story|feed|upload)\b/i.test(text);
   const mentionsVideo = /\b(last|new|recent|latest)?\s*(video|vlog|short|channel|stream)\b/i.test(text);
-  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see)\b/i.test(text);
-  if (asksToCheck || mentionsPost || mentionsVideo) {
+  const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|stats?)\b/i.test(text);
+  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me)\b/i.test(text);
+  if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile) {
     if (mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
-      const ytHandle = userSocials?.youtube;
+      let ytHandle = userSocials?.youtube;
+      if (!ytHandle && recentChatText) {
+        const found = recentChatText.match(/(?:youtube|yt|channel)\s+[:=]?\s*@?([A-Za-z0-9._-]+)/i);
+        if (found) ytHandle = found[1];
+      }
       if (ytHandle && typeof ytHandle === "string") {
         return await scrapeYouTubeChannel(ytHandle);
       }
     }
-    if (mentionsPost || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck) {
-      const igHandle = userSocials?.instagram;
+    if (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck) {
+      let igHandle = userSocials?.instagram;
+      if (!igHandle && recentChatText) {
+        const found = recentChatText.match(/(?:it's|its|is|handle|instagram|insta|ig)\s+[:=]?\s*@?([A-Za-z0-9._-]+)/i) || recentChatText.match(/@([A-Za-z0-9._-]+)/i);
+        if (found && !["the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
+          igHandle = found[1];
+        }
+      }
       if (igHandle && typeof igHandle === "string") {
         return await scrapeInstagramProfile(igHandle);
       }
@@ -202284,9 +202371,11 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
   const lastUserMsgText = text || lastUserText(storedMessages);
   let socialPerceptionBlock;
   let socialDataForMemory;
+  let socialData = null;
   try {
-    const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials);
-    const socialData = await Promise.race([
+    const recentChatText = storedMessages.slice(-6).map((m2) => m2.text).join("\n");
+    const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials, recentChatText);
+    socialData = await Promise.race([
       socialPerceptionTask,
       new Promise((resolve) => setTimeout(() => resolve(null), 3500))
     ]);
@@ -202344,7 +202433,8 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
     content = generateInCharacterFallback(lastUserMsgText, {
       knowsUser,
       callName,
-      characterName: character.name || "Elshine"
+      characterName: character.name || "Elshine",
+      socialData
     });
   }
   const assistantMessage = await addMessage(uid, chatId, { role: "assistant", text: content });

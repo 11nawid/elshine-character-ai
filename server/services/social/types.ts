@@ -24,6 +24,8 @@ export interface SocialProfileInfo {
   displayName?: string;
   bio?: string;
   followers?: string | number;
+  following?: string | number;
+  postCount?: string | number;
   isPrivate?: boolean;
   recentPosts: SocialPostInfo[];
 }
