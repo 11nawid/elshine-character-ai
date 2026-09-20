@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { auth, googleProvider } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
 import { ensureUser } from '../lib/api';
 import { friendlyAuthError } from '../lib/firebaseErrors';
-import { ArrowRight, Loader2, Globe, Eye, EyeOff } from 'lucide-react';
+import { ArrowRight, Loader2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface AuthProps {
@@ -27,6 +27,7 @@ const Auth: React.FC<AuthProps> = ({ initialMode = 'login', onToggleMode }) => {
   const toggleMode = () => {
     const newMode = isLogin ? 'register' : 'login';
     setIsLogin(!isLogin);
+    setError(null);
     onToggleMode?.(newMode);
   };
 
@@ -71,170 +72,216 @@ const Auth: React.FC<AuthProps> = ({ initialMode = 'login', onToggleMode }) => {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-white">
-      {/* Left Side: Cinematic Visual (Hidden on mobile) */}
+    <div className="flex h-screen w-full overflow-hidden bg-[#FAF7F2] text-[#161412] font-sans selection:bg-[#161412] selection:text-[#FAF7F2]">
+      
+      {/* IMMERSIVE ARTWORK PANEL:
+          - In LOGIN: Placed on the RIGHT (lg:order-2), with cobalt blue sketch
+          - In REGISTER: Placed on the LEFT (lg:order-1), with terracotta sketch
+          - Animates fluidly between sides with smooth spring layout transition
+      */}
       <motion.div 
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        className="hidden lg:flex w-1/2 bg-zinc-50 relative items-center justify-center p-20 overflow-hidden border-r border-zinc-100 h-full"
+        layout
+        transition={{ type: "spring", stiffness: 110, damping: 19, mass: 0.8 }}
+        className={`hidden lg:block w-1/2 relative bg-[#F5EFE6] h-full overflow-hidden ${
+          isLogin ? 'lg:order-2 border-l border-[#ECE4D8]' : 'lg:order-1 border-r border-[#ECE4D8]'
+        }`}
       >
-        <div className="absolute inset-0 opacity-40">
-          <img 
-            src="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2000" 
-            className="w-full h-full object-cover grayscale"
-            alt="Neural Background"
-          />
-        </div>
-        <div className="relative z-10 max-w-md space-y-6">
-          <div className="w-12 h-[1px] bg-black" />
-          <h2 className="text-4xl font-bold uppercase tracking-tighter leading-tight">
-            {isLogin ? 'Welcome back!' : 'Join our community today.'}
-          </h2>
-          <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-zinc-400 leading-relaxed">
-            {isLogin 
-              ? 'Sign in to continue chatting with your characters.' 
-              : 'Create an account to start building your own AI characters.'}
-          </p>
-        </div>
-        
-        {/* Bottom Label */}
-        <div className="absolute bottom-10 left-10">
-          <span className="text-[9px] font-black uppercase tracking-[1em] text-zinc-300">Elshine Character AI v2.6</span>
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={isLogin ? 'login-art' : 'register-art'}
+            initial={{ opacity: 0, scale: 1.03 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.4, ease: 'easeInOut' }}
+            className="w-full h-full relative"
+          >
+            <img 
+              src={isLogin ? '/images/auth_login.jpg' : '/images/auth_register.jpg'}
+              alt={isLogin ? 'Companion thoughts sketch' : 'Creative thoughts sketch'}
+              className="w-full h-full object-cover object-center"
+            />
+            {/* Subtle warm paper edge blend */}
+            <div className={`absolute inset-0 pointer-events-none ${
+              isLogin 
+                ? 'bg-gradient-to-l from-transparent via-transparent to-[#FAF7F2]/10' 
+                : 'bg-gradient-to-r from-transparent via-transparent to-[#FAF7F2]/10'
+            }`} />
+          </motion.div>
+        </AnimatePresence>
       </motion.div>
 
-      {/* Right Side: Form */}
-      <div className="flex-1 flex items-center justify-center p-8 md:p-12 lg:p-20 h-full overflow-hidden">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-[400px] flex flex-col justify-center h-full max-h-[800px]"
-        >
-          <Link to="/" className="inline-flex items-center gap-2.5 group mb-8 w-fit">
+      {/* MINIMAL AUTH FORM PANEL:
+          - In LOGIN: Positioned on the LEFT (lg:order-1)
+          - In REGISTER: Positioned on the RIGHT (lg:order-2)
+          - Glides gracefully into place when toggling modes
+      */}
+      <motion.div 
+        layout
+        transition={{ type: "spring", stiffness: 110, damping: 19, mass: 0.8 }}
+        className={`flex-1 flex flex-col justify-between p-6 sm:p-10 md:p-14 h-full overflow-y-auto ${
+          isLogin ? 'lg:order-1' : 'lg:order-2'
+        }`}
+      >
+        
+        {/* Top Header */}
+        <div className="flex items-center justify-between w-full max-w-sm mx-auto">
+          <Link to="/" className="inline-flex items-center gap-2 group">
             <img 
               src="/icon.png" 
               alt="Elshine AI" 
-              className="w-8 h-8 rounded-xl object-contain shadow-xs group-hover:scale-105 transition-transform" 
+              className="w-7 h-7 rounded-lg object-contain border border-[#ECE4D8]" 
             />
-            <span className="text-sm font-black uppercase tracking-tight text-zinc-900">
-              Elshine <span className="font-light text-zinc-400">AI</span>
+            <span className="text-sm font-black uppercase tracking-tight text-[#161412]">
+              Elshine <span className="font-light text-[#8C827A]">AI</span>
             </span>
           </Link>
 
-          <div className="space-y-4 mb-10">
-            <h1 className="text-6xl font-bold uppercase tracking-tighter leading-none">
-              {isLogin ? 'Sign In' : 'Sign Up'}
-            </h1>
-            <div className="w-8 h-[1px] bg-black/10" />
+          <Link 
+            to="/" 
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#8C827A] hover:text-[#161412] transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Home</span>
+          </Link>
+        </div>
+
+        {/* Center Form */}
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-sm mx-auto my-auto space-y-5"
+        >
+          <h1 className="text-3xl font-serif text-[#161412]">
+            {isLogin ? 'Sign In' : 'Sign Up'}
+          </h1>
+
+          {/* Google Sign-in */}
+          <button 
+            type="button"
+            onClick={() => handleSocialLogin(googleProvider)}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white border border-[#E0D7CC] rounded-xl text-xs font-semibold text-[#161412] hover:bg-[#F9F6F0] hover:border-[#D0C5B7] transition-all shadow-2xs disabled:opacity-60 cursor-pointer"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z" />
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15Z" />
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z" />
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          {/* Clean Divider */}
+          <div className="relative flex items-center justify-center my-1">
+            <div className="w-full border-t border-[#ECE4D8]"></div>
+            <span className="bg-[#FAF7F2] px-2.5 text-[11px] font-semibold text-[#8C827A] absolute">
+              or
+            </span>
           </div>
 
-          <div className="space-y-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {!isLogin && (
-                <div className="relative group">
-                  <input 
-                    type="text"
-                    required
-                    placeholder=" "
-                    value={formData.displayName}
-                    onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                    className="w-full bg-transparent border-b border-zinc-300 py-3 text-xs focus:border-black transition-all outline-none font-sans placeholder:text-zinc-400 peer tracking-widest font-bold"
-                  />
-                  <label className="absolute left-0 top-3 text-[10px] font-bold uppercase tracking-widest text-zinc-500 pointer-events-none transition-all peer-focus:-top-2 peer-focus:text-black peer-[:not(:placeholder-shown)]:-top-2 peer-[:not(:placeholder-shown)]:text-black">
-                    Name
-                  </label>
-                </div>
-              )}
-
-              <div className="relative group">
-                <input 
-                  type="email"
-                  required
-                  placeholder=" "
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full bg-transparent border-b border-zinc-300 py-3 text-xs focus:border-black transition-all outline-none font-sans placeholder:text-zinc-400 peer tracking-widest font-bold"
-                />
-                <label className="absolute left-0 top-3 text-[10px] font-bold uppercase tracking-widest text-zinc-500 pointer-events-none transition-all peer-focus:-top-2 peer-focus:text-black peer-[:not(:placeholder-shown)]:-top-2 peer-[:not(:placeholder-shown)]:text-black">
-                  Email
+          {/* Input Form */}
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            {!isLogin && (
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-[#161412] block">
+                  Name
                 </label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="Your name"
+                  value={formData.displayName}
+                  onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                  className="w-full bg-white border border-[#E0D7CC] rounded-xl px-3.5 py-2.5 text-sm text-[#161412] placeholder:text-[#A89F95] focus:border-[#163326] focus:ring-2 focus:ring-[#163326]/10 outline-none transition-all"
+                />
               </div>
+            )}
 
-              <div className="relative group">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-[#161412] block">
+                Email
+              </label>
+              <input 
+                type="email"
+                required
+                placeholder="name@example.com"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full bg-white border border-[#E0D7CC] rounded-xl px-3.5 py-2.5 text-sm text-[#161412] placeholder:text-[#A89F95] focus:border-[#163326] focus:ring-2 focus:ring-[#163326]/10 outline-none transition-all"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-[#161412] block">
+                Password
+              </label>
+              <div className="relative">
                 <input 
                   type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder=" "
+                  placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full bg-transparent border-b border-zinc-300 py-3 text-xs focus:border-black transition-all outline-none font-sans placeholder:text-zinc-400 peer tracking-widest font-bold pr-10"
+                  className="w-full bg-white border border-[#E0D7CC] rounded-xl pl-3.5 pr-10 py-2.5 text-sm text-[#161412] placeholder:text-[#A89F95] focus:border-[#163326] focus:ring-2 focus:ring-[#163326]/10 outline-none transition-all"
                 />
-                <label className="absolute left-0 top-3 text-[10px] font-bold uppercase tracking-widest text-zinc-500 pointer-events-none transition-all peer-focus:-top-2 peer-focus:text-black peer-[:not(:placeholder-shown)]:-top-2 peer-[:not(:placeholder-shown)]:text-black">
-                  Password
-                </label>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-0 top-3 text-zinc-400 hover:text-black transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8C827A] hover:text-[#161412] transition-colors cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+            </div>
 
-              {error && (
-                <motion.p 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-[10px] font-bold text-red-500 uppercase tracking-widest text-center"
-                >
-                  Error: {error}
-                </motion.p>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-2.5 bg-[#FDF2F0] border border-[#F5C7C1] rounded-xl text-xs text-[#B92A20] font-medium leading-tight"
+              >
+                {error}
+              </motion.div>
+            )}
+
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full bg-[#163326] text-[#FAF7F2] py-2.5 px-6 rounded-full text-xs font-bold uppercase tracking-[0.15em] hover:bg-[#204936] transition-all shadow-xs hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer pt-3 pb-3 mt-1"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>{isLogin ? 'Sign In' : 'Sign Up'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
+            </button>
+          </form>
 
-              <button 
-                type="submit"
-                disabled={loading}
-                className="w-full bg-black text-white py-5 text-[11px] font-bold uppercase tracking-[0.5em] hover:bg-zinc-800 transition-all disabled:opacity-50 flex items-center justify-center gap-4 group mt-4"
-              >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                  <>
-                    {isLogin ? 'Sign In' : 'Sign Up'}
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-2 transition-transform" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="relative py-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-zinc-200"></div>
-              </div>
-              <div className="relative flex justify-center text-[9px] uppercase tracking-[0.4em] font-bold">
-                <span className="bg-white px-4 text-zinc-400">Social Login</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              <button 
-                onClick={() => handleSocialLogin(googleProvider)}
-                className="flex items-center justify-center gap-3 py-4 border border-zinc-300 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-black hover:text-white hover:border-black transition-all group"
-              >
-                <Globe className="w-3 h-3 text-zinc-400 group-hover:text-white" />
-                Google
-              </button>
-            </div>
-
-            <div className="text-center pt-6">
-              <button 
-                onClick={toggleMode}
-                className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] hover:text-black transition-colors"
-              >
-                {isLogin ? "Create an account" : "Already have an account?"}
-              </button>
-            </div>
+          {/* Mode Switch */}
+          <div className="text-center pt-1">
+            <button 
+              type="button"
+              onClick={toggleMode}
+              className="text-xs text-[#5C554E] hover:text-[#161412] font-medium transition-colors cursor-pointer"
+            >
+              {isLogin ? (
+                <>Don't have an account? <span className="font-bold underline text-[#161412]">Sign up</span></>
+              ) : (
+                <>Already have an account? <span className="font-bold underline text-[#161412]">Sign in</span></>
+              )}
+            </button>
           </div>
         </motion.div>
-      </div>
+
+        {/* Empty bottom spacer for symmetrical alignment */}
+        <div className="h-6" />
+
+      </motion.div>
     </div>
   );
 };

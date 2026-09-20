@@ -68,6 +68,7 @@ export interface Character {
   creatorId: string;
   creatorName?: string;
   name: string;
+  role?: string;
   description: string;
   personality: string;
   traits: CharacterTraits;
