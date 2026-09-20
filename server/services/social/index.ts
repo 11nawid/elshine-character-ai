@@ -53,18 +53,26 @@ export async function resolveAndScrapeSocial(
     || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:youtube|yt)/i);
   if (ytHandleMatch) return await scrapeYouTubeChannel(ytHandleMatch[1]);
 
-  // 6. Conversational requests referencing user's posts, followers, or profile -> fallback to profile socials or chat history!
+  // 6. Conversational requests referencing user's posts, subscribers, or profile -> fallback to profile socials or chat history!
   const mentionsPost = /\b(last|new|recent|latest)?\s*(post|reel|picture|photo|pic|story|feed|upload)\b/i.test(text);
   const mentionsVideo = /\b(last|new|recent|latest)?\s*(video|vlog|short|channel|stream)\b/i.test(text);
+  const mentionsSubs = /\b(subs?|subscribers?|sub\s*count)\b/i.test(text);
   const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|stats?)\b/i.test(text);
-  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me)\b/i.test(text);
+  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
 
-  if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile) {
-    if (mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
+  if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile || mentionsSubs) {
+    if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
       let ytHandle = userSocials?.youtube;
       if (!ytHandle && recentChatText) {
-        const found = recentChatText.match(/(?:youtube|yt|channel)\s+[:=]?\s*@?([A-Za-z0-9._-]+)/i);
-        if (found) ytHandle = found[1];
+        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
+        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
+          ytHandle = atMatch[1];
+        } else {
+          const found = recentChatText.match(/(?:youtube|yt|channel)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
+          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
+            ytHandle = found[1];
+          }
+        }
       }
       if (ytHandle && typeof ytHandle === "string") {
         return await scrapeYouTubeChannel(ytHandle);
@@ -74,10 +82,14 @@ export async function resolveAndScrapeSocial(
     if (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck) {
       let igHandle = userSocials?.instagram;
       if (!igHandle && recentChatText) {
-        const found = recentChatText.match(/(?:it's|its|is|handle|instagram|insta|ig)\s+[:=]?\s*@?([A-Za-z0-9._-]+)/i)
-          || recentChatText.match(/@([A-Za-z0-9._-]+)/i);
-        if (found && !["the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
-          igHandle = found[1];
+        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
+        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
+          igHandle = atMatch[1];
+        } else {
+          const found = recentChatText.match(/(?:it's|its|is|handle|instagram|insta|ig)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
+          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
+            igHandle = found[1];
+          }
         }
       }
       if (igHandle && typeof igHandle === "string") {

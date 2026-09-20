@@ -51,6 +51,15 @@ export const REFUSAL_KEYWORDS = [
   "i'm just an ai",
   "i am an ai",
   "i'm an ai",
+  "can't see your subscriber count",
+  "can't see your sub count",
+  "can't see your subscribers",
+  "can't see subscribers",
+  "cannot see your subscriber",
+  "cannot see your sub",
+  "don't have access to your subscriber",
+  "can't view your subscriber",
+  "pretend it's millions",
 ];
 
 export function getMessageText(m: any): string {
@@ -108,10 +117,18 @@ export function generateInCharacterFallback(lastUserMsgText: string, ctx: Fallba
     lowerInput.includes("post") ||
     lowerInput.includes("insta") ||
     lowerInput.includes("youtube") ||
-    lowerInput.includes("video")
+    lowerInput.includes("video") ||
+    lowerInput.includes("sub") ||
+    lowerInput.includes("subs") ||
+    lowerInput.includes("subscriber")
   ) {
     if (ctx.socialData?.profile) {
       const p = ctx.socialData.profile;
+      if (p.platform === "youtube" || p.subscribers) {
+        const subs = p.subscribers || p.followers || "a few";
+        const vids = p.videoCount || p.postCount;
+        return `You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}!`;
+      }
       const followers = p.followers !== undefined ? `${p.followers} followers` : "your profile";
       const posts = p.postCount !== undefined ? `${p.postCount} posts` : "0 posts yet";
       return `Yeah! I just checked your Insta on my phone—you've got ${followers} and ${posts}!`;

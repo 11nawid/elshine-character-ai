@@ -201384,7 +201384,16 @@ var REFUSAL_KEYWORDS = [
   "i am just an ai",
   "i'm just an ai",
   "i am an ai",
-  "i'm an ai"
+  "i'm an ai",
+  "can't see your subscriber count",
+  "can't see your sub count",
+  "can't see your subscribers",
+  "can't see subscribers",
+  "cannot see your subscriber",
+  "cannot see your sub",
+  "don't have access to your subscriber",
+  "can't view your subscriber",
+  "pretend it's millions"
 ];
 function getMessageText(m2) {
   if (typeof m2?.content === "string") return m2.content;
@@ -201411,9 +201420,14 @@ function isRefusalContent(content) {
 }
 function generateInCharacterFallback(lastUserMsgText, ctx) {
   const lowerInput = lastUserMsgText.toLowerCase();
-  if (lowerInput.includes("instagram") || lowerInput.includes("followers") || lowerInput.includes("post") || lowerInput.includes("insta") || lowerInput.includes("youtube") || lowerInput.includes("video")) {
+  if (lowerInput.includes("instagram") || lowerInput.includes("followers") || lowerInput.includes("post") || lowerInput.includes("insta") || lowerInput.includes("youtube") || lowerInput.includes("video") || lowerInput.includes("sub") || lowerInput.includes("subs") || lowerInput.includes("subscriber")) {
     if (ctx.socialData?.profile) {
       const p = ctx.socialData.profile;
+      if (p.platform === "youtube" || p.subscribers) {
+        const subs = p.subscribers || p.followers || "a few";
+        const vids = p.videoCount || p.postCount;
+        return `You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}!`;
+      }
       const followers = p.followers !== void 0 ? `${p.followers} followers` : "your profile";
       const posts = p.postCount !== void 0 ? `${p.postCount} posts` : "0 posts yet";
       return `Yeah! I just checked your Insta on my phone\u2014you've got ${followers} and ${posts}!`;
@@ -202068,10 +202082,24 @@ async function scrapeYouTubeChannel(rawHandle) {
       const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]*)"/i);
       if (titleMatch) channelTitle = titleMatch[1].replace(/ - YouTube$/, "").trim();
       const recentVideos = [];
+      let subscribers;
+      let videoCount;
       const initialMatch = html.match(/var ytInitialData\s*=\s*({.+?});<\/script>/s);
       if (initialMatch) {
         try {
           const initial = JSON.parse(initialMatch[1]);
+          const header = initial?.header?.pageHeaderRenderer || initial?.header?.c4TabbedHeaderRenderer;
+          if (header?.subscriberCountText?.simpleText) {
+            subscribers = header.subscriberCountText.simpleText;
+          }
+          const rows = header?.content?.pageHeaderViewModel?.metadata?.contentMetadataViewModel?.metadataRows || [];
+          for (const row of rows) {
+            for (const part of row.metadataParts || []) {
+              const content = part?.text?.content || "";
+              if (/subscribers/i.test(content)) subscribers = content;
+              if (/videos/i.test(content)) videoCount = content;
+            }
+          }
           const tabs = initial?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
           const videoTab = tabs.find((t2) => t2.tabRenderer?.title?.toLowerCase?.() === "videos") || tabs[0];
           const contents = videoTab?.tabRenderer?.content?.richGridRenderer?.contents || videoTab?.tabRenderer?.content?.sectionListRenderer?.contents?.[0]?.itemSectionRenderer?.contents?.[0]?.gridRenderer?.items || [];
@@ -202093,6 +202121,14 @@ async function scrapeYouTubeChannel(rawHandle) {
           }
         } catch {
         }
+      }
+      if (!subscribers) {
+        const sm = html.match(/([0-9,.]+[KMBkmb]?\s+subscribers)/i);
+        if (sm) subscribers = sm[1];
+      }
+      if (!videoCount) {
+        const vm = html.match(/([0-9,.]+[KMBkmb]?\s+videos)/i);
+        if (vm) videoCount = vm[1];
       }
       if (recentVideos.length === 0) {
         const regex = /"videoId":"([A-Za-z0-9_-]{11})","thumbnail":.+?"title":{"runs":\[{"text":"([^"]+)"}\]/g;
@@ -202120,6 +202156,10 @@ async function scrapeYouTubeChannel(rawHandle) {
           platform: "youtube",
           handle,
           displayName: channelTitle,
+          followers: subscribers,
+          subscribers,
+          postCount: videoCount,
+          videoCount,
           recentPosts: recentVideos
         },
         recentPosts: recentVideos
@@ -202169,23 +202209,24 @@ ${p.engagement?.comments ? `- Comments: ${p.engagement.comments}` : ""}
 ${p.extraDetails ? `- Additional Details / Description: "${p.extraDetails}"` : ""}`;
   } else if (data.profile) {
     const prof = data.profile;
+    const isYT = data.platform === "youtube";
     summary += `Profile Details for ${prof.displayName || prof.handle}:
 - Username / Handle: @${prof.handle}
 ${prof.displayName ? `- Profile Name: "${prof.displayName}"` : ""}
-${prof.followers ? `- Followers: ${prof.followers}` : ""}
-${prof.following ? `- Following: ${prof.following}` : ""}
-${prof.postCount !== void 0 ? `- Total Posts: ${prof.postCount}` : ""}
+${isYT ? `- Subscribers Count: ${prof.subscribers || prof.followers || "0"}` : prof.followers ? `- Followers Count: ${prof.followers}` : ""}
+${isYT ? `- Total Videos Uploaded: ${prof.videoCount || prof.postCount || "0"}` : prof.postCount !== void 0 ? `- Total Posts: ${prof.postCount}` : ""}
+${!isYT && prof.following ? `- Following: ${prof.following}` : ""}
 ${prof.bio ? `- Bio / Description: "${prof.bio}"` : ""}`;
     if (prof.recentPosts && prof.recentPosts.length > 0) {
       summary += `
-Latest Posts Observed on their Feed:`;
+Latest ${isYT ? "Videos" : "Posts"} Observed on their Channel / Feed:`;
       prof.recentPosts.forEach((post, i2) => {
         summary += `
-  [Post ${i2 + 1} (${post.mediaType || "post"})]: "${post.titleOrCaption}"${post.timestampText ? ` (Posted: ${post.timestampText})` : ""}${post.engagement?.likes ? ` - ${post.engagement.likes} likes` : ""}${post.engagement?.views ? ` - ${post.engagement.views}` : ""}`;
+  [${isYT ? "Video" : "Post"} ${i2 + 1}]: "${post.titleOrCaption}"${post.timestampText ? ` (Posted: ${post.timestampText})` : ""}${post.engagement?.views ? ` - ${post.engagement.views}` : ""}${post.engagement?.likes ? ` - ${post.engagement.likes} likes` : ""}`;
       });
-    } else if (prof.postCount === "0" || prof.postCount === 0) {
+    } else if (prof.postCount === "0" || prof.postCount === 0 || prof.videoCount === "0" || prof.videoCount === 0) {
       summary += `
-- Posts on Feed: None (0 posts published yet)`;
+- Content on Feed: None published yet`;
     }
   }
   return `=== REAL-TIME SOCIAL MEDIA PERCEPTION (CONFIDENTIAL - FOR CHARACTER AWARENESS ONLY) ===
@@ -202195,7 +202236,7 @@ ${summary}
 
 HUMAN BEHAVIOR & IMMERSION INSTRUCTIONS:
 1. ACT LIKE A REAL FRIEND: Speak as if you just looked at the post/video on your phone with your own eyes.
-2. ANSWER THEIR QUESTIONS DIRECTLY: If they asked about their follower count, post count, or display name, tell them the exact numbers/details shown above naturally (e.g. "Yeah! You've got 830 followers, but wait, you don't have any posts yet!").
+2. ANSWER SUBSCRIBERS, FOLLOWERS & STATS DIRECTLY: If they asked about their subscriber count (e.g. "how many subs i got"), follower count, video count, or display name, answer directly using the exact numbers shown above (e.g. "You've got 16 subscribers on your channel right now!"). NEVER say "I can't see your subscriber count" or pretend you don't know!
 3. REFERENCE REAL DETAILS: Comment specifically on the topic, caption, imagery, or humor shown in the post/video/profile above.
 4. CASUAL TONE: Keep it effortless, conversational, and true to your character's voice. Pick what catches your eye naturally.
 5. STRICT PRIVACY & NO META-TALK: Under NO circumstances tell the user you "scraped" it, "queried an API", or received system data. To you, you just opened the ${platform} app on your phone.`;
@@ -202226,14 +202267,22 @@ async function resolveAndScrapeSocial(messageText, userSocials, recentChatText) 
   if (ytHandleMatch) return await scrapeYouTubeChannel(ytHandleMatch[1]);
   const mentionsPost = /\b(last|new|recent|latest)?\s*(post|reel|picture|photo|pic|story|feed|upload)\b/i.test(text);
   const mentionsVideo = /\b(last|new|recent|latest)?\s*(video|vlog|short|channel|stream)\b/i.test(text);
+  const mentionsSubs = /\b(subs?|subscribers?|sub\s*count)\b/i.test(text);
   const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|stats?)\b/i.test(text);
-  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me)\b/i.test(text);
-  if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile) {
-    if (mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
+  const asksToCheck = /\b(check|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
+  if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile || mentionsSubs) {
+    if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
       let ytHandle = userSocials?.youtube;
       if (!ytHandle && recentChatText) {
-        const found = recentChatText.match(/(?:youtube|yt|channel)\s+[:=]?\s*@?([A-Za-z0-9._-]+)/i);
-        if (found) ytHandle = found[1];
+        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
+        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
+          ytHandle = atMatch[1];
+        } else {
+          const found = recentChatText.match(/(?:youtube|yt|channel)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
+          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
+            ytHandle = found[1];
+          }
+        }
       }
       if (ytHandle && typeof ytHandle === "string") {
         return await scrapeYouTubeChannel(ytHandle);
@@ -202242,9 +202291,14 @@ async function resolveAndScrapeSocial(messageText, userSocials, recentChatText) 
     if (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck) {
       let igHandle = userSocials?.instagram;
       if (!igHandle && recentChatText) {
-        const found = recentChatText.match(/(?:it's|its|is|handle|instagram|insta|ig)\s+[:=]?\s*@?([A-Za-z0-9._-]+)/i) || recentChatText.match(/@([A-Za-z0-9._-]+)/i);
-        if (found && !["the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
-          igHandle = found[1];
+        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
+        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
+          igHandle = atMatch[1];
+        } else {
+          const found = recentChatText.match(/(?:it's|its|is|handle|instagram|insta|ig)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
+          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
+            igHandle = found[1];
+          }
         }
       }
       if (igHandle && typeof igHandle === "string") {

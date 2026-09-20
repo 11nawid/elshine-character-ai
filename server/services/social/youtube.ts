@@ -133,11 +133,27 @@ export async function scrapeYouTubeChannel(rawHandle: string): Promise<SocialPer
 
       const recentVideos: SocialPostInfo[] = [];
 
-      // Scrapfly technique: Parse ytInitialData tab renderers
+      let subscribers: string | undefined;
+      let videoCount: string | undefined;
+
+      // Scrapfly technique: Parse ytInitialData tab renderers & channel header
       const initialMatch = html.match(/var ytInitialData\s*=\s*({.+?});<\/script>/s);
       if (initialMatch) {
         try {
           const initial = JSON.parse(initialMatch[1]);
+          const header = initial?.header?.pageHeaderRenderer || initial?.header?.c4TabbedHeaderRenderer;
+          if (header?.subscriberCountText?.simpleText) {
+            subscribers = header.subscriberCountText.simpleText;
+          }
+          const rows = header?.content?.pageHeaderViewModel?.metadata?.contentMetadataViewModel?.metadataRows || [];
+          for (const row of rows) {
+            for (const part of row.metadataParts || []) {
+              const content = part?.text?.content || "";
+              if (/subscribers/i.test(content)) subscribers = content;
+              if (/videos/i.test(content)) videoCount = content;
+            }
+          }
+
           const tabs = initial?.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
           const videoTab = tabs.find((t: any) => t.tabRenderer?.title?.toLowerCase?.() === "videos") || tabs[0];
           const contents = videoTab?.tabRenderer?.content?.richGridRenderer?.contents
@@ -163,7 +179,16 @@ export async function scrapeYouTubeChannel(rawHandle: string): Promise<SocialPer
         } catch {}
       }
 
-      // Regex fallback if initialData parsing missed videos
+      // Regex fallback if initialData parsing missed videos or subscribers
+      if (!subscribers) {
+        const sm = html.match(/([0-9,.]+[KMBkmb]?\s+subscribers)/i);
+        if (sm) subscribers = sm[1];
+      }
+      if (!videoCount) {
+        const vm = html.match(/([0-9,.]+[KMBkmb]?\s+videos)/i);
+        if (vm) videoCount = vm[1];
+      }
+
       if (recentVideos.length === 0) {
         const regex = /"videoId":"([A-Za-z0-9_-]{11})","thumbnail":.+?"title":{"runs":\[{"text":"([^"]+)"}\]/g;
         let m: RegExpExecArray | null;
@@ -191,6 +216,10 @@ export async function scrapeYouTubeChannel(rawHandle: string): Promise<SocialPer
           platform: "youtube",
           handle,
           displayName: channelTitle,
+          followers: subscribers,
+          subscribers,
+          postCount: videoCount,
+          videoCount,
           recentPosts: recentVideos,
         },
         recentPosts: recentVideos,

@@ -47,21 +47,22 @@ ${p.engagement?.comments ? `- Comments: ${p.engagement.comments}` : ""}
 ${p.extraDetails ? `- Additional Details / Description: "${p.extraDetails}"` : ""}`;
   } else if (data.profile) {
     const prof = data.profile;
+    const isYT = data.platform === "youtube";
     summary += `Profile Details for ${prof.displayName || prof.handle}:
 - Username / Handle: @${prof.handle}
 ${prof.displayName ? `- Profile Name: "${prof.displayName}"` : ""}
-${prof.followers ? `- Followers: ${prof.followers}` : ""}
-${prof.following ? `- Following: ${prof.following}` : ""}
-${prof.postCount !== undefined ? `- Total Posts: ${prof.postCount}` : ""}
+${isYT ? `- Subscribers Count: ${prof.subscribers || prof.followers || "0"}` : (prof.followers ? `- Followers Count: ${prof.followers}` : "")}
+${isYT ? `- Total Videos Uploaded: ${prof.videoCount || prof.postCount || "0"}` : (prof.postCount !== undefined ? `- Total Posts: ${prof.postCount}` : "")}
+${!isYT && prof.following ? `- Following: ${prof.following}` : ""}
 ${prof.bio ? `- Bio / Description: "${prof.bio}"` : ""}`;
 
     if (prof.recentPosts && prof.recentPosts.length > 0) {
-      summary += `\nLatest Posts Observed on their Feed:`;
+      summary += `\nLatest ${isYT ? "Videos" : "Posts"} Observed on their Channel / Feed:`;
       prof.recentPosts.forEach((post, i) => {
-        summary += `\n  [Post ${i + 1} (${post.mediaType || "post"})]: "${post.titleOrCaption}"${post.timestampText ? ` (Posted: ${post.timestampText})` : ""}${post.engagement?.likes ? ` - ${post.engagement.likes} likes` : ""}${post.engagement?.views ? ` - ${post.engagement.views}` : ""}`;
+        summary += `\n  [${isYT ? "Video" : "Post"} ${i + 1}]: "${post.titleOrCaption}"${post.timestampText ? ` (Posted: ${post.timestampText})` : ""}${post.engagement?.views ? ` - ${post.engagement.views}` : ""}${post.engagement?.likes ? ` - ${post.engagement.likes} likes` : ""}`;
       });
-    } else if (prof.postCount === "0" || prof.postCount === 0) {
-      summary += `\n- Posts on Feed: None (0 posts published yet)`;
+    } else if (prof.postCount === "0" || prof.postCount === 0 || prof.videoCount === "0" || prof.videoCount === 0) {
+      summary += `\n- Content on Feed: None published yet`;
     }
   }
 
@@ -72,7 +73,7 @@ ${summary}
 
 HUMAN BEHAVIOR & IMMERSION INSTRUCTIONS:
 1. ACT LIKE A REAL FRIEND: Speak as if you just looked at the post/video on your phone with your own eyes.
-2. ANSWER THEIR QUESTIONS DIRECTLY: If they asked about their follower count, post count, or display name, tell them the exact numbers/details shown above naturally (e.g. "Yeah! You've got 830 followers, but wait, you don't have any posts yet!").
+2. ANSWER SUBSCRIBERS, FOLLOWERS & STATS DIRECTLY: If they asked about their subscriber count (e.g. "how many subs i got"), follower count, video count, or display name, answer directly using the exact numbers shown above (e.g. "You've got 16 subscribers on your channel right now!"). NEVER say "I can't see your subscriber count" or pretend you don't know!
 3. REFERENCE REAL DETAILS: Comment specifically on the topic, caption, imagery, or humor shown in the post/video/profile above.
 4. CASUAL TONE: Keep it effortless, conversational, and true to your character's voice. Pick what catches your eye naturally.
 5. STRICT PRIVACY & NO META-TALK: Under NO circumstances tell the user you "scraped" it, "queried an API", or received system data. To you, you just opened the ${platform} app on your phone.`;

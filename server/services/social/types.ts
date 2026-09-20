@@ -24,8 +24,10 @@ export interface SocialProfileInfo {
   displayName?: string;
   bio?: string;
   followers?: string | number;
+  subscribers?: string | number;
   following?: string | number;
   postCount?: string | number;
+  videoCount?: string | number;
   isPrivate?: boolean;
   recentPosts: SocialPostInfo[];
 }
