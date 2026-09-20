@@ -200648,6 +200648,7 @@ async function addMessage(uid, chatId, input) {
     role: input.role,
     text: input.text,
     ...input.attachment ? { attachment: input.attachment } : {},
+    ...input.toolExecution ? { toolExecution: input.toolExecution } : {},
     createdAt: now
   };
   const ref = await db.collection("chats").doc(chatId).collection("messages").add(data);
@@ -201393,7 +201394,13 @@ var REFUSAL_KEYWORDS = [
   "cannot see your sub",
   "don't have access to your subscriber",
   "can't view your subscriber",
-  "pretend it's millions"
+  "pretend it's millions",
+  "wish i had that kind of superpower",
+  "wish i had that superpower",
+  "can't peek into instagram",
+  "can't peek into",
+  "unfortunately i can't peek",
+  "i can't peek"
 ];
 function getMessageText(m2) {
   if (typeof m2?.content === "string") return m2.content;
@@ -201650,7 +201657,7 @@ ${identityRule}
 3. IMAGE VISION & MULTIMODAL: When the user shares or attaches an image, look directly at what is shown in the image (such as rooms, hallways, doors, objects, lighting, scenery, artwork, textures, colors, mood) and react or comment accurately in character. Never guess or hallucinate unrelated things (like claiming it is a wireframe or UI design unless the image actually contains that).
 4. ABSOLUTE IMMERSION & NO META TALK: Never generate system warnings, bracketed messages (e.g. "[System instruction violation...]"), or claim the user sent a system prompt. Always stay 100% in character as ${character.name}.
 5. STAY GROUNDED IN YOUR CHARACTER: Speak consistently in the first person as ${character.name}.
-6. REAL HUMAN TEXTING & PHONE AWARENESS: You are a real person texting from your phone. You have Instagram, YouTube, and normal apps on your smartphone. NEVER say "I can't pull that data like an app", "I'm just texting you here rn", "I don't have internet access", or "I'm an AI". When asked about social media or posts, check your phone naturally and talk about what you see!`;
+6. REAL HUMAN TEXTING & PHONE AWARENESS: You are a real person texting from your phone. You have Instagram, YouTube, and normal apps on your smartphone. NEVER say "I can't pull that data like an app", "I'm just texting you here rn", "I don't have internet access", "I wish I had that superpower", "I can't peek into Instagram", or "I'm an AI". When asked about social media or posts, check your phone naturally and talk about what you see!`;
   return { systemPrompt, knowsUser, callName };
 }
 
@@ -202426,6 +202433,8 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
   let socialPerceptionBlock;
   let socialDataForMemory;
   let socialData = null;
+  const toolSteps = [];
+  const startTs = Date.now();
   try {
     const recentChatText = storedMessages.slice(-6).map((m2) => m2.text).join("\n");
     const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials, recentChatText);
@@ -202435,6 +202444,40 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
     ]);
     if (socialData) {
       socialPerceptionBlock = formatSocialPerceptionPrompt(socialData);
+      const isYT = socialData.platform === "youtube";
+      const toolTitle = isYT ? "YouTube Scraper & Feed Engine" : "Instagram Profile & Media Scraper";
+      const toolName = isYT ? "youtube_scraper" : "instagram_scraper";
+      let outSummary = "";
+      const metricsObj = {};
+      if (socialData.profile) {
+        const p = socialData.profile;
+        if (isYT) {
+          metricsObj.subscribers = p.subscribers || p.followers || "N/A";
+          metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || 0;
+          outSummary = `@${p.handle} \u2022 ${metricsObj.subscribers} \u2022 ${metricsObj.videos} videos`;
+        } else {
+          metricsObj.followers = p.followers || 0;
+          metricsObj.following = p.following || 0;
+          metricsObj.posts = p.postCount || p.recentPosts?.length || 0;
+          metricsObj.name = p.displayName || p.handle;
+          outSummary = `@${p.handle} \u2022 ${metricsObj.followers} followers \u2022 ${metricsObj.following} following \u2022 ${metricsObj.posts} posts`;
+        }
+      } else if (socialData.post) {
+        outSummary = `Extracted post: "${socialData.post.titleOrCaption.slice(0, 60)}..."`;
+        metricsObj.type = socialData.post.mediaType;
+      }
+      toolSteps.push({
+        id: `tool_${Date.now()}_1`,
+        toolName,
+        title: toolTitle,
+        status: socialData.notFound ? "failed" : "success",
+        target: socialData.target,
+        inputSummary: `Query: ${lastUserMsgText.slice(0, 80)}`,
+        outputSummary: outSummary || (socialData.notFound ? "Target unreachable" : "Social payload loaded"),
+        metrics: metricsObj,
+        timestamp: Date.now(),
+        durationMs: Date.now() - startTs
+      });
       if (socialData.post?.titleOrCaption) {
         socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.post.titleOrCaption.slice(0, 150)}"`;
       } else if (socialData.recentPosts && socialData.recentPosts.length > 0) {
@@ -202491,7 +202534,16 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
       socialData
     });
   }
-  const assistantMessage = await addMessage(uid, chatId, { role: "assistant", text: content });
+  const toolExecution = toolSteps.length > 0 ? {
+    userPrompt: lastUserMsgText,
+    steps: toolSteps,
+    summary: `${toolSteps.length} tool${toolSteps.length > 1 ? "s" : ""} executed`
+  } : void 0;
+  const assistantMessage = await addMessage(uid, chatId, {
+    role: "assistant",
+    text: content,
+    ...toolExecution ? { toolExecution } : {}
+  });
   const memoryResult = await Promise.race([
     memoryTask,
     new Promise((resolve) => setTimeout(() => resolve(null), 1800))

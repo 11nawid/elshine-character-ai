@@ -13,6 +13,25 @@ export interface AttachmentDoc {
   name: string;
 }
 
+export interface ToolExecutionStepDoc {
+  id: string;
+  toolName: string;
+  title: string;
+  status: "running" | "success" | "failed" | "fallback";
+  target?: string;
+  inputSummary?: string;
+  outputSummary?: string;
+  metrics?: Record<string, string | number | undefined>;
+  timestamp: number;
+  durationMs?: number;
+}
+
+export interface MessageToolExecutionDoc {
+  userPrompt: string;
+  steps: ToolExecutionStepDoc[];
+  summary: string;
+}
+
 export interface MessageDoc {
   id: string;
   chatId: string;
@@ -20,6 +39,7 @@ export interface MessageDoc {
   role: "user" | "assistant";
   text: string;
   attachment?: AttachmentDoc;
+  toolExecution?: MessageToolExecutionDoc;
   createdAt: number;
 }
 
@@ -40,6 +60,7 @@ export interface AddMessageInput {
   role: "user" | "assistant";
   text: string;
   attachment?: AttachmentDoc;
+  toolExecution?: MessageToolExecutionDoc;
 }
 
 function toChat(id: string, data: any): ChatDoc {
@@ -119,6 +140,7 @@ export async function addMessage(uid: string, chatId: string, input: AddMessageI
     role: input.role,
     text: input.text,
     ...(input.attachment ? { attachment: input.attachment } : {}),
+    ...(input.toolExecution ? { toolExecution: input.toolExecution } : {}),
     createdAt: now,
   };
   const ref = await db.collection("chats").doc(chatId).collection("messages").add(data);

@@ -117,6 +117,25 @@ export interface Attachment {
   name: string;
 }
 
+export interface ToolExecutionStep {
+  id: string;
+  toolName: string;
+  title: string;
+  status: 'running' | 'success' | 'failed' | 'fallback';
+  target?: string;
+  inputSummary?: string;
+  outputSummary?: string;
+  metrics?: Record<string, string | number | undefined>;
+  timestamp: number;
+  durationMs?: number;
+}
+
+export interface MessageToolExecution {
+  userPrompt: string;
+  steps: ToolExecutionStep[];
+  summary: string;
+}
+
 export interface Message {
   id: string;
   chatId: string;
@@ -124,6 +143,7 @@ export interface Message {
   role: 'user' | 'assistant';
   text: string;
   attachment?: Attachment;
+  toolExecution?: MessageToolExecution;
   createdAt: number;
 }
 

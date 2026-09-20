@@ -60,6 +60,12 @@ export const REFUSAL_KEYWORDS = [
   "don't have access to your subscriber",
   "can't view your subscriber",
   "pretend it's millions",
+  "wish i had that kind of superpower",
+  "wish i had that superpower",
+  "can't peek into instagram",
+  "can't peek into",
+  "unfortunately i can't peek",
+  "i can't peek",
 ];
 
 export function getMessageText(m: any): string {

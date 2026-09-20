@@ -7,6 +7,7 @@ import { cn } from "../../lib/utils";
 import LocalAttachmentViewer from "./LocalAttachmentViewer";
 import { cleanDisplayContent, isRefusalText } from "./chatUtils";
 import { characterAvatar } from "../../lib/avatar";
+import ToolExecutionMap from "./ToolExecutionMap";
 
 interface ChatMessageListProps {
   messages: Message[];
@@ -75,6 +76,10 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                       : cleanDisplayContent(m.text)}
                   </ReactMarkdown>
                 </div>
+
+                {!isUser && m.toolExecution && (
+                  <ToolExecutionMap toolExecution={m.toolExecution} />
+                )}
 
                 <div className={cn(
                   "absolute -top-2.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-20",

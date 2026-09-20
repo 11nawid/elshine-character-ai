@@ -1,7 +1,17 @@
 import { Router } from "express";
 import { requireAuth, currentUser } from "../auth";
 import { asRecord, optionalBoolean, optionalObject, optionalString, requireEnum, requireString } from "../validation";
-import { getChatForUser, listMessages, addMessage, setMemories, deleteMessage, type AttachmentDoc, type MessageDoc } from "../repos/chat-repo";
+import {
+  getChatForUser,
+  listMessages,
+  addMessage,
+  setMemories,
+  deleteMessage,
+  type AttachmentDoc,
+  type MessageDoc,
+  type ToolExecutionStepDoc,
+  type MessageToolExecutionDoc,
+} from "../repos/chat-repo";
 import { getCharacter, isVisibleTo } from "../repos/character-repo";
 import { getUser } from "../repos/user-repo";
 import { filterRefusalMessages, sanitizeBracketedContent, isRefusalContent, generateInCharacterFallback } from "../genai/refusals";
@@ -149,6 +159,8 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
   let socialPerceptionBlock: string | undefined;
   let socialDataForMemory: string | undefined;
   let socialData: any = null;
+  const toolSteps: ToolExecutionStepDoc[] = [];
+  const startTs = Date.now();
 
   try {
     const recentChatText = storedMessages.slice(-6).map((m) => m.text).join("\n");
@@ -161,6 +173,44 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
 
     if (socialData) {
       socialPerceptionBlock = formatSocialPerceptionPrompt(socialData);
+      const isYT = socialData.platform === "youtube";
+      const toolTitle = isYT ? "YouTube Scraper & Feed Engine" : "Instagram Profile & Media Scraper";
+      const toolName = isYT ? "youtube_scraper" : "instagram_scraper";
+
+      let outSummary = "";
+      const metricsObj: Record<string, string | number | undefined> = {};
+
+      if (socialData.profile) {
+        const p = socialData.profile;
+        if (isYT) {
+          metricsObj.subscribers = p.subscribers || p.followers || "N/A";
+          metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || 0;
+          outSummary = `@${p.handle} • ${metricsObj.subscribers} • ${metricsObj.videos} videos`;
+        } else {
+          metricsObj.followers = p.followers || 0;
+          metricsObj.following = p.following || 0;
+          metricsObj.posts = p.postCount || p.recentPosts?.length || 0;
+          metricsObj.name = p.displayName || p.handle;
+          outSummary = `@${p.handle} • ${metricsObj.followers} followers • ${metricsObj.following} following • ${metricsObj.posts} posts`;
+        }
+      } else if (socialData.post) {
+        outSummary = `Extracted post: "${socialData.post.titleOrCaption.slice(0, 60)}..."`;
+        metricsObj.type = socialData.post.mediaType;
+      }
+
+      toolSteps.push({
+        id: `tool_${Date.now()}_1`,
+        toolName,
+        title: toolTitle,
+        status: socialData.notFound ? "failed" : "success",
+        target: socialData.target,
+        inputSummary: `Query: ${lastUserMsgText.slice(0, 80)}`,
+        outputSummary: outSummary || (socialData.notFound ? "Target unreachable" : "Social payload loaded"),
+        metrics: metricsObj,
+        timestamp: Date.now(),
+        durationMs: Date.now() - startTs,
+      });
+
       if (socialData.post?.titleOrCaption) {
         socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.post.titleOrCaption.slice(0, 150)}"`;
       } else if (socialData.recentPosts && socialData.recentPosts.length > 0) {
@@ -226,7 +276,17 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
     });
   }
 
-  const assistantMessage = await addMessage(uid, chatId, { role: "assistant", text: content });
+  const toolExecution: MessageToolExecutionDoc | undefined = toolSteps.length > 0 ? {
+    userPrompt: lastUserMsgText,
+    steps: toolSteps,
+    summary: `${toolSteps.length} tool${toolSteps.length > 1 ? "s" : ""} executed`,
+  } : undefined;
+
+  const assistantMessage = await addMessage(uid, chatId, {
+    role: "assistant",
+    text: content,
+    ...(toolExecution ? { toolExecution } : {}),
+  });
 
   // Await memory extraction with a short fallback race
   const memoryResult = await Promise.race([
