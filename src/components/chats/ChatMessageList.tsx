@@ -90,30 +90,11 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   </ReactMarkdown>
                 </div>
 
-                {!isUser && (m.toolExecution || isMapOpen(m.id, false)) && (
+                {!isUser && m.toolExecution && m.toolExecution.steps?.length > 0 && (
                   <ToolExecutionMap
-                    toolExecution={
-                      m.toolExecution || {
-                        userPrompt: messages[idx - 1]?.text || "Direct interaction",
-                        steps: [
-                          {
-                            id: `step_${m.id}`,
-                            toolName: "persona_inference_engine",
-                            title: "Persona Reasoning & Context Engine",
-                            status: "success",
-                            target: character.name,
-                            inputSummary: messages[idx - 1]?.text?.slice(0, 80) || "Conversation context",
-                            outputSummary: "Synthesized in-character companion response",
-                            timestamp: m.createdAt,
-                            durationMs: 340,
-                            metrics: { companion: character.name, role: character.role || "Companion" },
-                          },
-                        ],
-                        summary: "Persona Reasoning & Pipeline",
-                      }
-                    }
-                    isOpen={isMapOpen(m.id, !!m.toolExecution)}
-                    onToggle={() => togglePipelineMap(m.id, !!m.toolExecution)}
+                    toolExecution={m.toolExecution}
+                    isOpen={isMapOpen(m.id, true)}
+                    onToggle={() => togglePipelineMap(m.id, true)}
                   />
                 )}
 
@@ -121,17 +102,17 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   "absolute -top-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 z-30",
                   isUser ? "left-2" : "right-2"
                 )}>
-                  {!isUser && (
+                  {!isUser && m.toolExecution && (
                     <button
                       type="button"
-                      onClick={() => togglePipelineMap(m.id, !!m.toolExecution)}
+                      onClick={() => togglePipelineMap(m.id, true)}
                       className={cn(
                         "p-1.5 rounded-full shadow-sm border transition-all active:scale-95 cursor-pointer flex items-center justify-center",
-                        isMapOpen(m.id, !!m.toolExecution)
+                        isMapOpen(m.id, true)
                           ? "text-amber-600 hover:text-amber-700 bg-amber-50 border-amber-300 ring-2 ring-amber-400/40"
                           : "text-zinc-500 hover:text-black hover:bg-zinc-100 border-zinc-200 bg-white"
                       )}
-                      title="Inspect AI Tools & Pipeline Map"
+                      title="Inspect Synaptic Tool Pipeline Map"
                     >
                       <Workflow className="w-3.5 h-3.5" />
                     </button>

@@ -202742,11 +202742,11 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
   const toolSteps = [];
   const startTs = Date.now();
   try {
-    const recentChatText = storedMessages.slice(-6).map((m2) => m2.text).join("\n");
+    const recentChatText = storedMessages.slice(-15).map((m2) => m2.text).join("\n");
     const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials, recentChatText);
     socialData = await Promise.race([
       socialPerceptionTask,
-      new Promise((resolve) => setTimeout(() => resolve(null), 4e3))
+      new Promise((resolve) => setTimeout(() => resolve(null), 14e3))
     ]);
     if (socialData) {
       const items2 = Array.isArray(socialData) ? socialData : [socialData];
@@ -202761,10 +202761,12 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
         const metricsObj = {};
         if (item.profile) {
           const p = item.profile;
+          metricsObj.handle = `@${p.handle}`;
+          metricsObj.name = p.displayName || p.handle;
           if (isYT) {
-            metricsObj.subscribers = p.subscribers || p.followers || "N/A";
-            metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || 0;
-            outSummary = `@${p.handle} \u2022 ${metricsObj.subscribers} \u2022 ${metricsObj.videos} videos`;
+            metricsObj.subscribers = p.subscribers || p.followers || "0 subscribers";
+            metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || "0 videos";
+            outSummary = `@${p.handle} \u2022 ${metricsObj.subscribers} \u2022 ${metricsObj.videos}`;
             if (p.handle && profile?.socials?.youtube !== p.handle) {
               updateUser(uid, { socials: { ...profile?.socials || {}, youtube: p.handle } }).catch(() => {
               });
@@ -202773,7 +202775,6 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
             metricsObj.followers = p.followers || 0;
             metricsObj.following = p.following || 0;
             metricsObj.posts = p.postCount || p.recentPosts?.length || 0;
-            metricsObj.name = p.displayName || p.handle;
             outSummary = `@${p.handle} \u2022 ${metricsObj.followers} followers \u2022 ${metricsObj.following} following \u2022 ${metricsObj.posts} posts`;
             if (p.handle && profile?.socials?.instagram !== p.handle) {
               updateUser(uid, { socials: { ...profile?.socials || {}, instagram: p.handle } }).catch(() => {
