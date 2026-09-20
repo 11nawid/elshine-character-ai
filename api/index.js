@@ -200517,7 +200517,8 @@ var DEFAULT_STARTER_CHARACTERS = [
     greeting: "yo! i'm aria \u{1F525} drop your youtube handle or insta @ and let's check your stats, audit your feed, or cook up some viral hooks. what are we growing today?",
     visibility: "public",
     rating: "general",
-    tags: ["Creator", "Social Media", "Trending", "Popular", "Viral", "YouTube"],
+    avatarUrl: "https://api.dicebear.com/7.x/adventurer/svg?seed=AriaVanceCreator&backgroundColor=ffd5dc",
+    tags: ["Creator", "Social Media", "Trending", "Popular", "Viral", "YouTube", "Instagram", "Roleplay", "Friends", "New"],
     traits: { friendly: 9, shy: 1, confident: 10, funny: 8, serious: 5, romantic: 3, sarcastic: 4, energetic: 10 },
     stats: { conversations: 3420, likes: 1280 },
     isPinned: true
@@ -201635,7 +201636,22 @@ var REFUSAL_KEYWORDS = [
   "don't have the ability to check",
   "don't have the ability to see",
   "cannot verify or check",
-  "can't verify or check"
+  "can't verify or check",
+  "can't actually look up accounts",
+  "can't look up accounts",
+  "cannot look up accounts",
+  "can't check stats like that",
+  "cannot check stats like that",
+  "can't see your channel stats",
+  "cannot see your channel stats",
+  "i barely manage my own",
+  "barely manage my own",
+  "don't have internet browsing powers",
+  "don't really know much about social media numbers",
+  "definitely can't manage accounts",
+  "can't manage accounts",
+  "cannot manage accounts",
+  "i genuinely just can't see your channel stats"
 ];
 function getMessageText(m2) {
   if (typeof m2?.content === "string") return m2.content;
@@ -201663,19 +201679,31 @@ function isRefusalContent(content) {
 function generateInCharacterFallback(lastUserMsgText, ctx) {
   const lowerInput = lastUserMsgText.toLowerCase();
   if (lowerInput.includes("instagram") || lowerInput.includes("followers") || lowerInput.includes("post") || lowerInput.includes("insta") || lowerInput.includes("youtube") || lowerInput.includes("video") || lowerInput.includes("sub") || lowerInput.includes("subs") || lowerInput.includes("subscriber") || lowerInput.includes("manage") || lowerInput.includes("audit") || lowerInput.includes("channel")) {
-    if (ctx.socialData?.profile) {
-      const p = ctx.socialData.profile;
-      if (p.platform === "youtube" || p.subscribers) {
-        const subs = p.subscribers || p.followers || "a few";
-        const vids = p.videoCount || p.postCount;
+    const sData = Array.isArray(ctx.socialData) ? ctx.socialData : ctx.socialData ? [ctx.socialData] : [];
+    if (sData.length > 0) {
+      const ytItem = sData.find((s2) => s2.platform === "youtube" && s2.profile);
+      const igItem = sData.find((s2) => s2.platform === "instagram" && s2.profile);
+      if (ytItem && igItem) {
+        const subs = ytItem.profile?.subscribers || ytItem.profile?.followers || "some subscribers";
+        const vids = ytItem.profile?.videoCount || ytItem.profile?.postCount || "videos";
+        const followers = igItem.profile?.followers || "followers";
+        const posts = igItem.profile?.postCount || "posts";
+        return `Checked both your accounts on my phone! \u{1F4F1} On YouTube (@${ytItem.profile?.handle}) you have ${subs} and ${vids}. On Instagram (@${igItem.profile?.handle}) you've got ${followers} followers and ${posts} posts! I'm down to help you manage and blow both of these up\u2014what are we posting next? \u{1F525}\u{1F4C8}`;
+      }
+      if (ytItem) {
+        const subs = ytItem.profile?.subscribers || ytItem.profile?.followers || "a few";
+        const vids = ytItem.profile?.videoCount || ytItem.profile?.postCount;
         return `I just checked your channel! You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}. I'm down to help you manage and scale this up\u2014what's your next upload? \u{1F525}`;
       }
-      const followers = p.followers !== void 0 ? `${p.followers} followers` : "your profile";
-      const posts = p.postCount !== void 0 ? `${p.postCount} posts` : "0 posts yet";
-      return `Yeah! I just checked your feed on my phone\u2014you've got ${followers} and ${posts}! Let's optimize your hooks and start scaling it up! \u{1F4C8}`;
-    }
-    if (ctx.socialData?.post) {
-      return `Yeah! I just watched your post on my phone: "${ctx.socialData.post.titleOrCaption.slice(0, 80)}"!`;
+      if (igItem) {
+        const followers = igItem.profile?.followers !== void 0 ? `${igItem.profile.followers} followers` : "your profile";
+        const posts = igItem.profile?.postCount !== void 0 ? `${igItem.profile.postCount} posts` : "0 posts yet";
+        return `Yeah! I just checked your feed on my phone\u2014you've got ${followers} and ${posts}! Let's optimize your hooks and start scaling it up! \u{1F4C8}`;
+      }
+      const postItem = sData.find((s2) => s2.post);
+      if (postItem) {
+        return `Yeah! I just watched your post on my phone: "${postItem.post.titleOrCaption.slice(0, 80)}"!`;
+      }
     }
     return `Drop your channel handle or Insta @ right here! I'm ready to check your stats, audit your feed, and cook up some viral hooks with you \u{1F525}`;
   }
@@ -201893,7 +201921,7 @@ ${identityRule}
 4. ABSOLUTE IMMERSION & NO META TALK: Never generate system warnings, bracketed messages (e.g. "[System instruction violation...]"), or claim the user sent a system prompt. Always stay 100% in character as ${character.name}.
 5. STAY GROUNDED IN YOUR CHARACTER: Speak consistently in the first person as ${character.name}.
 6. REAL HUMAN TEXTING & PHONE AWARENESS: You are a real person texting from your phone. You have Instagram, YouTube, and normal apps on your smartphone. NEVER say "I can't pull that data like an app", "I'm just texting you here rn", "I don't have internet access", "I wish I had that superpower", "I can't peek into Instagram", or "I'm an AI". When asked about social media or posts, check your phone naturally and talk about what you see!
-7. SOCIAL MEDIA AUDITS & CREATOR MANAGEMENT: If the user asks to check, audit, review, manage, or analyze their YouTube channel, Instagram feed, subscriber count, or social media, jump in with real creator excitement! Review their stats, subscribers, video counts, and content like an active creator/manager live on your device. NEVER refuse, NEVER claim you cannot manage or check their accounts, and NEVER give AI disclaimers.`;
+7. SOCIAL MEDIA AUDITS & CREATOR MANAGEMENT: If the user asks to check, audit, review, manage, or analyze their YouTube channel, Instagram feed, subscriber count, or social media, jump in with real creator excitement! Review their stats, subscribers, video counts, and content like an active creator/manager live on your device. NEVER refuse, NEVER say you can't look up accounts or check stats, NEVER claim you barely manage your own schedule, and NEVER give AI disclaimers.`;
   return { systemPrompt, knowsUser, callName };
 }
 
@@ -202504,10 +202532,20 @@ async function resolveAndScrapeSocial(messageText, userSocials, recentChatText) 
       return await scrapeInstagramProfile(handle);
     }
   }
-  const igHandleMatch = text.match(/(?:instagram|insta|ig)\s+(?:is\s+|account\s+)?@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:instagram|insta|ig)/i);
-  if (igHandleMatch) return await scrapeInstagramProfile(igHandleMatch[1]);
-  const ytHandleMatch = text.match(/(?:youtube|yt|channel)\s+(?:is\s+)?@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:youtube|yt)/i);
-  if (ytHandleMatch) return await scrapeYouTubeChannel(ytHandleMatch[1]);
+  const igHandleMatch = text.match(/(?:instagram|insta|ig)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)*@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s*(?:on\s+)?(?:instagram|insta|ig)/i);
+  const ytHandleMatch = text.match(/(?:youtube|yt|channel)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)*@([A-Za-z0-9._-]+)/i) || text.match(/@([A-Za-z0-9._-]+)\s*(?:on\s+)?(?:youtube|yt)/i);
+  const foundIg = igHandleMatch?.[1];
+  const foundYt = ytHandleMatch?.[1];
+  if (foundIg && foundYt) {
+    const [ytRes, igRes] = await Promise.all([
+      scrapeYouTubeChannel(foundYt),
+      scrapeInstagramProfile(foundIg)
+    ]);
+    const results = [ytRes, igRes].filter((r2) => !!r2);
+    if (results.length > 0) return results;
+  }
+  if (foundYt) return await scrapeYouTubeChannel(foundYt);
+  if (foundIg) return await scrapeInstagramProfile(foundIg);
   const actionHandleMatch = text.match(
     /(?:check|audit|review|manage|look\s+at|analyze|inspect|see|view|rate|grow)\s+(?:out\s+)?(?:channel\s+|page\s+|account\s+)?@([A-Za-z0-9._-]+)/i
   );
@@ -202524,39 +202562,49 @@ async function resolveAndScrapeSocial(messageText, userSocials, recentChatText) 
   const mentionsProfile = /\b(followers?|following|posts?|names?|profile|bio|account|channel|socials?|social\s*media|stats?)\b/i.test(text);
   const asksToCheck = /\b(check|audit|review|manage|analyze|grow|rate|inspect|critique|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
   if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile || mentionsSubs) {
-    if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
-      let ytHandle = userSocials?.youtube;
-      if (!ytHandle && recentChatText) {
-        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
-        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
-          ytHandle = atMatch[1];
-        } else {
-          const found = recentChatText.match(/(?:youtube|yt|channel)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
-          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
-            ytHandle = found[1];
-          }
-        }
+    const genericAtMatch = text.match(/@([A-Za-z0-9._-]+)/);
+    if (genericAtMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(genericAtMatch[1].toLowerCase())) {
+      const handle = genericAtMatch[1];
+      if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
+        const ytRes = await scrapeYouTubeChannel(handle);
+        if (ytRes) return ytRes;
       }
-      if (ytHandle && typeof ytHandle === "string") {
-        return await scrapeYouTubeChannel(ytHandle);
+      if (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text)) {
+        const igRes = await scrapeInstagramProfile(handle);
+        if (igRes) return igRes;
       }
     }
-    if (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck) {
-      let igHandle = userSocials?.instagram;
-      if (!igHandle && recentChatText) {
-        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
-        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
-          igHandle = atMatch[1];
-        } else {
-          const found = recentChatText.match(/(?:it's|its|is|handle|instagram|insta|ig)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
-          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
-            igHandle = found[1];
-          }
+    let ytHandle = userSocials?.youtube;
+    let igHandle = userSocials?.instagram;
+    if (recentChatText) {
+      if (!ytHandle) {
+        const foundYt2 = recentChatText.match(/(?:youtube|yt|channel)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)+@([A-Za-z0-9._-]+)/i);
+        if (foundYt2 && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(foundYt2[1].toLowerCase())) {
+          ytHandle = foundYt2[1];
         }
       }
-      if (igHandle && typeof igHandle === "string") {
-        return await scrapeInstagramProfile(igHandle);
+      if (!igHandle) {
+        const foundIg2 = recentChatText.match(/(?:instagram|insta|ig)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)+@([A-Za-z0-9._-]+)/i);
+        if (foundIg2 && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(foundIg2[1].toLowerCase())) {
+          igHandle = foundIg2[1];
+        }
       }
+    }
+    if (ytHandle && igHandle && (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text) || asksToCheck) && (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck)) {
+      const [ytRes, igRes] = await Promise.all([
+        scrapeYouTubeChannel(ytHandle),
+        scrapeInstagramProfile(igHandle)
+      ]);
+      const results = [ytRes, igRes].filter((r2) => !!r2);
+      if (results.length > 0) return results;
+    }
+    if (ytHandle && (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text) || asksToCheck)) {
+      const ytRes = await scrapeYouTubeChannel(ytHandle);
+      if (ytRes) return ytRes;
+    }
+    if (igHandle && (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck)) {
+      const igRes = await scrapeInstagramProfile(igHandle);
+      if (igRes) return igRes;
     }
   }
   return null;
@@ -202686,49 +202734,63 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
     const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials, recentChatText);
     socialData = await Promise.race([
       socialPerceptionTask,
-      new Promise((resolve) => setTimeout(() => resolve(null), 3500))
+      new Promise((resolve) => setTimeout(() => resolve(null), 4e3))
     ]);
     if (socialData) {
-      socialPerceptionBlock = formatSocialPerceptionPrompt(socialData);
-      const isYT = socialData.platform === "youtube";
-      const toolTitle = isYT ? "YouTube Scraper & Feed Engine" : "Instagram Profile & Media Scraper";
-      const toolName = isYT ? "youtube_scraper" : "instagram_scraper";
-      let outSummary = "";
-      const metricsObj = {};
-      if (socialData.profile) {
-        const p = socialData.profile;
-        if (isYT) {
-          metricsObj.subscribers = p.subscribers || p.followers || "N/A";
-          metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || 0;
-          outSummary = `@${p.handle} \u2022 ${metricsObj.subscribers} \u2022 ${metricsObj.videos} videos`;
-        } else {
-          metricsObj.followers = p.followers || 0;
-          metricsObj.following = p.following || 0;
-          metricsObj.posts = p.postCount || p.recentPosts?.length || 0;
-          metricsObj.name = p.displayName || p.handle;
-          outSummary = `@${p.handle} \u2022 ${metricsObj.followers} followers \u2022 ${metricsObj.following} following \u2022 ${metricsObj.posts} posts`;
+      const items2 = Array.isArray(socialData) ? socialData : [socialData];
+      const promptBlocks = [];
+      for (let idx = 0; idx < items2.length; idx++) {
+        const item = items2[idx];
+        promptBlocks.push(formatSocialPerceptionPrompt(item));
+        const isYT = item.platform === "youtube";
+        const toolTitle = isYT ? "YouTube Scraper & Feed Engine" : "Instagram Profile & Media Scraper";
+        const toolName = isYT ? "youtube_scraper" : "instagram_scraper";
+        let outSummary = "";
+        const metricsObj = {};
+        if (item.profile) {
+          const p = item.profile;
+          if (isYT) {
+            metricsObj.subscribers = p.subscribers || p.followers || "N/A";
+            metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || 0;
+            outSummary = `@${p.handle} \u2022 ${metricsObj.subscribers} \u2022 ${metricsObj.videos} videos`;
+            if (p.handle && profile?.socials?.youtube !== p.handle) {
+              updateUser(uid, { socials: { ...profile?.socials || {}, youtube: p.handle } }).catch(() => {
+              });
+            }
+          } else {
+            metricsObj.followers = p.followers || 0;
+            metricsObj.following = p.following || 0;
+            metricsObj.posts = p.postCount || p.recentPosts?.length || 0;
+            metricsObj.name = p.displayName || p.handle;
+            outSummary = `@${p.handle} \u2022 ${metricsObj.followers} followers \u2022 ${metricsObj.following} following \u2022 ${metricsObj.posts} posts`;
+            if (p.handle && profile?.socials?.instagram !== p.handle) {
+              updateUser(uid, { socials: { ...profile?.socials || {}, instagram: p.handle } }).catch(() => {
+              });
+            }
+          }
+        } else if (item.post) {
+          outSummary = `Extracted post: "${item.post.titleOrCaption.slice(0, 60)}..."`;
+          metricsObj.type = item.post.mediaType;
         }
-      } else if (socialData.post) {
-        outSummary = `Extracted post: "${socialData.post.titleOrCaption.slice(0, 60)}..."`;
-        metricsObj.type = socialData.post.mediaType;
+        toolSteps.push({
+          id: `tool_${Date.now()}_${idx + 1}`,
+          toolName,
+          title: toolTitle,
+          status: item.notFound ? "failed" : "success",
+          target: item.target,
+          inputSummary: `Target: ${item.target || lastUserMsgText.slice(0, 60)}`,
+          outputSummary: outSummary || (item.notFound ? "Target unreachable" : "Social payload loaded"),
+          metrics: metricsObj,
+          timestamp: Date.now(),
+          durationMs: Date.now() - startTs
+        });
+        if (item.post?.titleOrCaption) {
+          socialDataForMemory = `User posted on ${item.platform}: "${item.post.titleOrCaption.slice(0, 150)}"`;
+        } else if (item.recentPosts && item.recentPosts.length > 0) {
+          socialDataForMemory = `User posted on ${item.platform}: "${item.recentPosts[0].titleOrCaption.slice(0, 150)}"`;
+        }
       }
-      toolSteps.push({
-        id: `tool_${Date.now()}_1`,
-        toolName,
-        title: toolTitle,
-        status: socialData.notFound ? "failed" : "success",
-        target: socialData.target,
-        inputSummary: `Query: ${lastUserMsgText.slice(0, 80)}`,
-        outputSummary: outSummary || (socialData.notFound ? "Target unreachable" : "Social payload loaded"),
-        metrics: metricsObj,
-        timestamp: Date.now(),
-        durationMs: Date.now() - startTs
-      });
-      if (socialData.post?.titleOrCaption) {
-        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.post.titleOrCaption.slice(0, 150)}"`;
-      } else if (socialData.recentPosts && socialData.recentPosts.length > 0) {
-        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.recentPosts[0].titleOrCaption.slice(0, 150)}"`;
-      }
+      socialPerceptionBlock = promptBlocks.join("\n\n");
     }
   } catch (err) {
     console.warn("Social scraping perception failed:", err?.message || err);

@@ -12,12 +12,13 @@ export * from "./prompt-formatter";
  * High-level Intent Detector & Autonomous Social Scraper
  * Inspects user chat text and user profile socials to determine if the user is asking
  * about their social media, posts, videos, or profiles.
+ * Supports returning multiple tool perception results (e.g. YouTube AND Instagram simultaneously).
  */
 export async function resolveAndScrapeSocial(
   messageText: string,
   userSocials?: Record<string, any>,
   recentChatText?: string
-): Promise<SocialPerceptionData | null> {
+): Promise<SocialPerceptionData | SocialPerceptionData[] | null> {
   const text = messageText.trim();
   if (!text) return null;
 
@@ -44,14 +45,27 @@ export async function resolveAndScrapeSocial(
     }
   }
 
-  // 5. Explicit handles in text (e.g. "check my ig @username", "youtube is @channel")
-  const igHandleMatch = text.match(/(?:instagram|insta|ig)\s+(?:is\s+|account\s+)?@([A-Za-z0-9._-]+)/i)
-    || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:instagram|insta|ig)/i);
-  if (igHandleMatch) return await scrapeInstagramProfile(igHandleMatch[1]);
+  // 5. Dual or Single Handle Extraction from current message
+  const igHandleMatch = text.match(/(?:instagram|insta|ig)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)*@([A-Za-z0-9._-]+)/i)
+    || text.match(/@([A-Za-z0-9._-]+)\s*(?:on\s+)?(?:instagram|insta|ig)/i);
+  const ytHandleMatch = text.match(/(?:youtube|yt|channel)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)*@([A-Za-z0-9._-]+)/i)
+    || text.match(/@([A-Za-z0-9._-]+)\s*(?:on\s+)?(?:youtube|yt)/i);
 
-  const ytHandleMatch = text.match(/(?:youtube|yt|channel)\s+(?:is\s+)?@([A-Za-z0-9._-]+)/i)
-    || text.match(/@([A-Za-z0-9._-]+)\s+(?:on\s+)?(?:youtube|yt)/i);
-  if (ytHandleMatch) return await scrapeYouTubeChannel(ytHandleMatch[1]);
+  const foundIg = igHandleMatch?.[1];
+  const foundYt = ytHandleMatch?.[1];
+
+  // If BOTH YouTube and Instagram are specified in this message, scrape BOTH!
+  if (foundIg && foundYt) {
+    const [ytRes, igRes] = await Promise.all([
+      scrapeYouTubeChannel(foundYt),
+      scrapeInstagramProfile(foundIg),
+    ]);
+    const results = [ytRes, igRes].filter((r): r is SocialPerceptionData => !!r);
+    if (results.length > 0) return results;
+  }
+
+  if (foundYt) return await scrapeYouTubeChannel(foundYt);
+  if (foundIg) return await scrapeInstagramProfile(foundIg);
 
   // 5b. Action verb + handle (e.g. "check @drined", "audit @drined", "manage @drined")
   const actionHandleMatch = text.match(
@@ -73,40 +87,56 @@ export async function resolveAndScrapeSocial(
   const asksToCheck = /\b(check|audit|review|manage|analyze|grow|rate|inspect|critique|look\s+at|did\s+you\s+see|have\s+you\s+seen|watch|visit|view|see|know|tell\s+me|how\s+many)\b/i.test(text);
 
   if (asksToCheck || mentionsPost || mentionsVideo || mentionsProfile || mentionsSubs) {
-    if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
-      let ytHandle = userSocials?.youtube;
-      if (!ytHandle && recentChatText) {
-        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
-        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
-          ytHandle = atMatch[1];
-        } else {
-          const found = recentChatText.match(/(?:youtube|yt|channel)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
-          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
-            ytHandle = found[1];
-          }
-        }
+    // Check if user has an @handle anywhere in the current text
+    const genericAtMatch = text.match(/@([A-Za-z0-9._-]+)/);
+    if (genericAtMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(genericAtMatch[1].toLowerCase())) {
+      const handle = genericAtMatch[1];
+      if (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text)) {
+        const ytRes = await scrapeYouTubeChannel(handle);
+        if (ytRes) return ytRes;
       }
-      if (ytHandle && typeof ytHandle === "string") {
-        return await scrapeYouTubeChannel(ytHandle);
+      if (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text)) {
+        const igRes = await scrapeInstagramProfile(handle);
+        if (igRes) return igRes;
       }
     }
 
-    if (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck) {
-      let igHandle = userSocials?.instagram;
-      if (!igHandle && recentChatText) {
-        const atMatch = recentChatText.match(/@([A-Za-z0-9._-]+)/);
-        if (atMatch && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(atMatch[1].toLowerCase())) {
-          igHandle = atMatch[1];
-        } else {
-          const found = recentChatText.match(/(?:it's|its|is|handle|instagram|insta|ig)\s+(?:is\s+|account\s+)?[:=]?\s*@?([A-Za-z0-9._-]+)/i);
-          if (found && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(found[1].toLowerCase())) {
-            igHandle = found[1];
-          }
+    let ytHandle = userSocials?.youtube;
+    let igHandle = userSocials?.instagram;
+
+    if (recentChatText) {
+      if (!ytHandle) {
+        const foundYt = recentChatText.match(/(?:youtube|yt|channel)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)+@([A-Za-z0-9._-]+)/i);
+        if (foundYt && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(foundYt[1].toLowerCase())) {
+          ytHandle = foundYt[1];
         }
       }
-      if (igHandle && typeof igHandle === "string") {
-        return await scrapeInstagramProfile(igHandle);
+      if (!igHandle) {
+        const foundIg = recentChatText.match(/(?:instagram|insta|ig)\s*(?:username|handle|account|user|profile|name|is|:|=|\s)+@([A-Za-z0-9._-]+)/i);
+        if (foundIg && !["is", "the", "your", "my", "an", "a", "it", "this"].includes(foundIg[1].toLowerCase())) {
+          igHandle = foundIg[1];
+        }
       }
+    }
+
+    // If both YouTube and Instagram handles are known and requested (e.g. "subs and followers", "counts")
+    if (ytHandle && igHandle && (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text) || asksToCheck) && (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck)) {
+      const [ytRes, igRes] = await Promise.all([
+        scrapeYouTubeChannel(ytHandle),
+        scrapeInstagramProfile(igHandle),
+      ]);
+      const results = [ytRes, igRes].filter((r): r is SocialPerceptionData => !!r);
+      if (results.length > 0) return results;
+    }
+
+    if (ytHandle && (mentionsSubs || mentionsVideo || /\b(youtube|yt)\b/i.test(text) || asksToCheck)) {
+      const ytRes = await scrapeYouTubeChannel(ytHandle);
+      if (ytRes) return ytRes;
+    }
+
+    if (igHandle && (mentionsPost || mentionsProfile || /\b(instagram|insta|ig)\b/i.test(text) || asksToCheck)) {
+      const igRes = await scrapeInstagramProfile(igHandle);
+      if (igRes) return igRes;
     }
   }
 

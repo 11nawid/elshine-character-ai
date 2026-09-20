@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Zap,
   ChevronDown,
@@ -18,11 +18,18 @@ import type { MessageToolExecution } from "../../types";
 
 interface ToolExecutionMapProps {
   toolExecution: MessageToolExecution;
+  initialOpen?: boolean;
 }
 
-export const ToolExecutionMap: React.FC<ToolExecutionMapProps> = ({ toolExecution }) => {
-  const [isOpen, setIsOpen] = useState(false);
+export const ToolExecutionMap: React.FC<ToolExecutionMapProps> = ({ toolExecution, initialOpen }) => {
+  const [isOpen, setIsOpen] = useState(initialOpen ?? false);
   const [isFullView, setIsFullView] = useState(false);
+
+  useEffect(() => {
+    if (initialOpen !== undefined) {
+      setIsOpen(initialOpen);
+    }
+  }, [initialOpen]);
 
   const steps = toolExecution?.steps || [];
   if (steps.length === 0) return null;
@@ -33,12 +40,14 @@ export const ToolExecutionMap: React.FC<ToolExecutionMapProps> = ({ toolExecutio
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="group inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-zinc-900/5 hover:bg-zinc-900/10 dark:bg-white/10 dark:hover:bg-white/15 text-zinc-700 dark:text-zinc-300 border border-zinc-300/40 dark:border-white/10 transition-all shadow-sm active:scale-95"
+        className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-semibold bg-zinc-900 text-white hover:bg-black border border-zinc-700/60 shadow-md transition-all active:scale-95 cursor-pointer mt-2.5"
       >
-        <Zap className="w-3 h-3 text-amber-500 animate-pulse" />
-        <span className="font-semibold">{toolExecution.summary || `${steps.length} Tool Executed`}</span>
-        <span className="text-[10px] text-zinc-500 dark:text-zinc-400">Map</span>
-        {isOpen ? <ChevronUp className="w-3 h-3 ml-0.5" /> : <ChevronDown className="w-3 h-3 ml-0.5" />}
+        <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400 animate-pulse" />
+        <span>{toolExecution.summary || `${steps.length} Tool Executed`}</span>
+        <span className="text-[10px] text-zinc-300 font-medium border-l border-zinc-700 pl-2">
+          {isOpen ? "Collapse Pipeline Map" : "View Pipeline Map"}
+        </span>
+        {isOpen ? <ChevronUp className="w-3.5 h-3.5 text-zinc-400" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />}
       </button>
 
       {/* Expandable Execution Map Panel */}

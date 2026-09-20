@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from "react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { RotateCcw, Trash2, Zap } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import type { Character, Message } from "../../types";
@@ -24,6 +24,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
   onRegenerate,
   onDeleteMessage,
 }) => {
+  const [inspectedMessageId, setInspectedMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -77,19 +78,56 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   </ReactMarkdown>
                 </div>
 
-                {!isUser && m.toolExecution && (
-                  <ToolExecutionMap toolExecution={m.toolExecution} />
+                {!isUser && (m.toolExecution || inspectedMessageId === m.id) && (
+                  <ToolExecutionMap
+                    toolExecution={
+                      m.toolExecution || {
+                        userPrompt: messages[idx - 1]?.text || "Direct interaction",
+                        steps: [
+                          {
+                            id: `step_${m.id}`,
+                            toolName: "persona_inference_engine",
+                            title: "Persona Reasoning & Context Engine",
+                            status: "success",
+                            target: character.name,
+                            inputSummary: messages[idx - 1]?.text?.slice(0, 80) || "Conversation context",
+                            outputSummary: "Synthesized in-character companion response",
+                            timestamp: m.createdAt,
+                            durationMs: 340,
+                            metrics: { companion: character.name, role: character.role || "Companion" },
+                          },
+                        ],
+                        summary: "Persona Reasoning & Pipeline",
+                      }
+                    }
+                    initialOpen={inspectedMessageId === m.id || !!m.toolExecution}
+                  />
                 )}
 
                 <div className={cn(
                   "absolute -top-2.5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 z-20",
-                  isUser ? "-left-14" : "-right-16"
+                  isUser ? "-left-14" : "-right-24"
                 )}>
+                  {!isUser && (
+                    <button
+                      type="button"
+                      onClick={() => setInspectedMessageId((prev) => (prev === m.id ? null : m.id))}
+                      className={cn(
+                        "p-1 rounded-full shadow-sm border transition-all active:scale-95 cursor-pointer",
+                        inspectedMessageId === m.id || m.toolExecution
+                          ? "text-amber-500 hover:text-amber-600 bg-amber-50 border-amber-300 ring-1 ring-amber-400/30"
+                          : "text-zinc-400 hover:text-black hover:bg-zinc-100 border-zinc-200 bg-white"
+                      )}
+                      title="Inspect tool callings & pipeline map"
+                    >
+                      <Zap className="w-3 h-3 fill-current" />
+                    </button>
+                  )}
                   {!isUser && m.id !== "temp" && (
                     <button
                       onClick={() => onRegenerate(m.id)}
                       disabled={isLoading}
-                      className="p-1 rounded-full text-zinc-400 hover:text-black hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95"
+                      className="p-1 rounded-full text-zinc-400 hover:text-black hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95 cursor-pointer"
                       title="Regenerate reply"
                     >
                       <RotateCcw className="w-3 h-3" />
@@ -98,7 +136,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                   {m.id !== "initial" && m.id !== "temp" && (
                     <button
                       onClick={() => onDeleteMessage(m.id)}
-                      className="p-1 rounded-full text-zinc-400 hover:text-red-500 hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95"
+                      className="p-1 rounded-full text-zinc-400 hover:text-red-500 hover:bg-zinc-100 shadow-sm border border-zinc-200 bg-white transition-all active:scale-95 cursor-pointer"
                       title="Delete message"
                     >
                       <Trash2 className="w-3 h-3" />

@@ -13,7 +13,7 @@ import {
   type MessageToolExecutionDoc,
 } from "../repos/chat-repo";
 import { getCharacter, isVisibleTo } from "../repos/character-repo";
-import { getUser } from "../repos/user-repo";
+import { getUser, updateUser } from "../repos/user-repo";
 import { filterRefusalMessages, sanitizeBracketedContent, isRefusalContent, generateInCharacterFallback } from "../genai/refusals";
 import { convertMessagesToGeminiContents, type GeminiContent } from "../genai/convert";
 import { buildChatSystemPrompt } from "../genai/prompt";
@@ -165,57 +165,71 @@ aiRouter.post("/chat", asyncHandler(async (req, res) => {
   try {
     const recentChatText = storedMessages.slice(-6).map((m) => m.text).join("\n");
     const socialPerceptionTask = resolveAndScrapeSocial(lastUserMsgText, profile?.socials, recentChatText);
-    // Timeout race: never delay chat generation by more than 3500ms
     socialData = await Promise.race([
       socialPerceptionTask,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
     ]);
 
     if (socialData) {
-      socialPerceptionBlock = formatSocialPerceptionPrompt(socialData);
-      const isYT = socialData.platform === "youtube";
-      const toolTitle = isYT ? "YouTube Scraper & Feed Engine" : "Instagram Profile & Media Scraper";
-      const toolName = isYT ? "youtube_scraper" : "instagram_scraper";
+      const items = Array.isArray(socialData) ? socialData : [socialData];
+      const promptBlocks: string[] = [];
 
-      let outSummary = "";
-      const metricsObj: Record<string, string | number | undefined> = {};
+      for (let idx = 0; idx < items.length; idx++) {
+        const item = items[idx];
+        promptBlocks.push(formatSocialPerceptionPrompt(item));
 
-      if (socialData.profile) {
-        const p = socialData.profile;
-        if (isYT) {
-          metricsObj.subscribers = p.subscribers || p.followers || "N/A";
-          metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || 0;
-          outSummary = `@${p.handle} • ${metricsObj.subscribers} • ${metricsObj.videos} videos`;
-        } else {
-          metricsObj.followers = p.followers || 0;
-          metricsObj.following = p.following || 0;
-          metricsObj.posts = p.postCount || p.recentPosts?.length || 0;
-          metricsObj.name = p.displayName || p.handle;
-          outSummary = `@${p.handle} • ${metricsObj.followers} followers • ${metricsObj.following} following • ${metricsObj.posts} posts`;
+        const isYT = item.platform === "youtube";
+        const toolTitle = isYT ? "YouTube Scraper & Feed Engine" : "Instagram Profile & Media Scraper";
+        const toolName = isYT ? "youtube_scraper" : "instagram_scraper";
+
+        let outSummary = "";
+        const metricsObj: Record<string, string | number | undefined> = {};
+
+        if (item.profile) {
+          const p = item.profile;
+          if (isYT) {
+            metricsObj.subscribers = p.subscribers || p.followers || "N/A";
+            metricsObj.videos = p.videoCount || p.postCount || p.recentPosts?.length || 0;
+            outSummary = `@${p.handle} • ${metricsObj.subscribers} • ${metricsObj.videos} videos`;
+            if (p.handle && profile?.socials?.youtube !== p.handle) {
+              updateUser(uid, { socials: { ...(profile?.socials || {}), youtube: p.handle } }).catch(() => {});
+            }
+          } else {
+            metricsObj.followers = p.followers || 0;
+            metricsObj.following = p.following || 0;
+            metricsObj.posts = p.postCount || p.recentPosts?.length || 0;
+            metricsObj.name = p.displayName || p.handle;
+            outSummary = `@${p.handle} • ${metricsObj.followers} followers • ${metricsObj.following} following • ${metricsObj.posts} posts`;
+            if (p.handle && profile?.socials?.instagram !== p.handle) {
+              updateUser(uid, { socials: { ...(profile?.socials || {}), instagram: p.handle } }).catch(() => {});
+            }
+          }
+        } else if (item.post) {
+          outSummary = `Extracted post: "${item.post.titleOrCaption.slice(0, 60)}..."`;
+          metricsObj.type = item.post.mediaType;
         }
-      } else if (socialData.post) {
-        outSummary = `Extracted post: "${socialData.post.titleOrCaption.slice(0, 60)}..."`;
-        metricsObj.type = socialData.post.mediaType;
+
+        toolSteps.push({
+          id: `tool_${Date.now()}_${idx + 1}`,
+          toolName,
+          title: toolTitle,
+          status: item.notFound ? "failed" : "success",
+          target: item.target,
+          inputSummary: `Target: ${item.target || lastUserMsgText.slice(0, 60)}`,
+          outputSummary: outSummary || (item.notFound ? "Target unreachable" : "Social payload loaded"),
+          metrics: metricsObj,
+          timestamp: Date.now(),
+          durationMs: Date.now() - startTs,
+        });
+
+        if (item.post?.titleOrCaption) {
+          socialDataForMemory = `User posted on ${item.platform}: "${item.post.titleOrCaption.slice(0, 150)}"`;
+        } else if (item.recentPosts && item.recentPosts.length > 0) {
+          socialDataForMemory = `User posted on ${item.platform}: "${item.recentPosts[0].titleOrCaption.slice(0, 150)}"`;
+        }
       }
 
-      toolSteps.push({
-        id: `tool_${Date.now()}_1`,
-        toolName,
-        title: toolTitle,
-        status: socialData.notFound ? "failed" : "success",
-        target: socialData.target,
-        inputSummary: `Query: ${lastUserMsgText.slice(0, 80)}`,
-        outputSummary: outSummary || (socialData.notFound ? "Target unreachable" : "Social payload loaded"),
-        metrics: metricsObj,
-        timestamp: Date.now(),
-        durationMs: Date.now() - startTs,
-      });
-
-      if (socialData.post?.titleOrCaption) {
-        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.post.titleOrCaption.slice(0, 150)}"`;
-      } else if (socialData.recentPosts && socialData.recentPosts.length > 0) {
-        socialDataForMemory = `User posted on ${socialData.platform}: "${socialData.recentPosts[0].titleOrCaption.slice(0, 150)}"`;
-      }
+      socialPerceptionBlock = promptBlocks.join("\n\n");
     }
   } catch (err: any) {
     console.warn("Social scraping perception failed:", err?.message || err);

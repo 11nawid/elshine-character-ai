@@ -82,6 +82,21 @@ export const REFUSAL_KEYWORDS = [
   "don't have the ability to see",
   "cannot verify or check",
   "can't verify or check",
+  "can't actually look up accounts",
+  "can't look up accounts",
+  "cannot look up accounts",
+  "can't check stats like that",
+  "cannot check stats like that",
+  "can't see your channel stats",
+  "cannot see your channel stats",
+  "i barely manage my own",
+  "barely manage my own",
+  "don't have internet browsing powers",
+  "don't really know much about social media numbers",
+  "definitely can't manage accounts",
+  "can't manage accounts",
+  "cannot manage accounts",
+  "i genuinely just can't see your channel stats",
 ];
 
 export function getMessageText(m: any): string {
@@ -147,19 +162,31 @@ export function generateInCharacterFallback(lastUserMsgText: string, ctx: Fallba
     lowerInput.includes("audit") ||
     lowerInput.includes("channel")
   ) {
-    if (ctx.socialData?.profile) {
-      const p = ctx.socialData.profile;
-      if (p.platform === "youtube" || p.subscribers) {
-        const subs = p.subscribers || p.followers || "a few";
-        const vids = p.videoCount || p.postCount;
+    const sData = Array.isArray(ctx.socialData) ? ctx.socialData : ctx.socialData ? [ctx.socialData] : [];
+    if (sData.length > 0) {
+      const ytItem = sData.find((s: any) => s.platform === "youtube" && s.profile);
+      const igItem = sData.find((s: any) => s.platform === "instagram" && s.profile);
+      if (ytItem && igItem) {
+        const subs = ytItem.profile?.subscribers || ytItem.profile?.followers || "some subscribers";
+        const vids = ytItem.profile?.videoCount || ytItem.profile?.postCount || "videos";
+        const followers = igItem.profile?.followers || "followers";
+        const posts = igItem.profile?.postCount || "posts";
+        return `Checked both your accounts on my phone! 📱 On YouTube (@${ytItem.profile?.handle}) you have ${subs} and ${vids}. On Instagram (@${igItem.profile?.handle}) you've got ${followers} followers and ${posts} posts! I'm down to help you manage and blow both of these up—what are we posting next? 🔥📈`;
+      }
+      if (ytItem) {
+        const subs = ytItem.profile?.subscribers || ytItem.profile?.followers || "a few";
+        const vids = ytItem.profile?.videoCount || ytItem.profile?.postCount;
         return `I just checked your channel! You've got ${subs} on your channel right now${vids ? ` and ${vids} uploaded` : ""}. I'm down to help you manage and scale this up—what's your next upload? 🔥`;
       }
-      const followers = p.followers !== undefined ? `${p.followers} followers` : "your profile";
-      const posts = p.postCount !== undefined ? `${p.postCount} posts` : "0 posts yet";
-      return `Yeah! I just checked your feed on my phone—you've got ${followers} and ${posts}! Let's optimize your hooks and start scaling it up! 📈`;
-    }
-    if (ctx.socialData?.post) {
-      return `Yeah! I just watched your post on my phone: "${ctx.socialData.post.titleOrCaption.slice(0, 80)}"!`;
+      if (igItem) {
+        const followers = igItem.profile?.followers !== undefined ? `${igItem.profile.followers} followers` : "your profile";
+        const posts = igItem.profile?.postCount !== undefined ? `${igItem.profile.postCount} posts` : "0 posts yet";
+        return `Yeah! I just checked your feed on my phone—you've got ${followers} and ${posts}! Let's optimize your hooks and start scaling it up! 📈`;
+      }
+      const postItem = sData.find((s: any) => s.post);
+      if (postItem) {
+        return `Yeah! I just watched your post on my phone: "${postItem.post.titleOrCaption.slice(0, 80)}"!`;
+      }
     }
     return `Drop your channel handle or Insta @ right here! I'm ready to check your stats, audit your feed, and cook up some viral hooks with you 🔥`;
   }
